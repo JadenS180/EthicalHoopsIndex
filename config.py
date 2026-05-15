@@ -35,6 +35,23 @@ ASSISTED_DEMERIT    = 0.90
 OPEN_MISS_MULT      = 0.85
 CONTESTED_MISS_MULT = 0.50
 
+# xeFG% by shot zone (hardcoded league averages)
+XEFG_AT_RIM         = 0.72
+XEFG_PAINT_NON_RIM  = 0.54
+XEFG_MID_RANGE      = 0.44
+XEFG_CORNER_3       = 0.58
+XEFG_ABOVE_BREAK_3  = 0.52
+XEFG_BACKCOURT      = 0.30
+
+# Chuck scoring
+CHUCK_PENALTY_EXP        = 1.4
+CHUCK_PENALTY_MULT       = 3
+
+# Edge cases / thresholds
+SQS_ZERO_SHOTS_BASELINE  = 50
+SQS_SC_XEFG_THRESHOLD    = 0.50   # min xeFG% for self-created bonus
+SQS_AST_XEFG_THRESHOLD   = 0.45   # max xeFG% for assisted demerit
+
 # ─── FDS CONSTANTS ──────────────────────────────────────────────────────────
 VOLUME_PENALTY_BASE = 2.5
 VOLUME_PENALTY_EXP  = 1.3

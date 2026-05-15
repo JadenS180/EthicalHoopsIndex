@@ -6,7 +6,7 @@ Implemented  : FTP — FT Dependency Score
                SPS — Sportsmanship Score
                DES — Defensive Effort Score
                FDS — Foul Drawing Score
-Stubs (TODO) : SQS
+               SQS — Shot Quality Score
 """
 
 import re
@@ -14,7 +14,7 @@ import re
 import pandas as pd
 
 from config import (
-    # Weights (used in final EHI roll-up once all sub-scores exist)
+    # Weights
     W_SQS, W_FDS, W_FTP, W_SPS, W_DES,
     # FTP constants
     FT_DEP_THRESHOLD,
@@ -52,6 +52,23 @@ from config import (
     GARBAGE_TIME_LEAD,
     GARBAGE_TIME_MINUTES_LEFT,
     GARBAGE_TIME_LEG_CAP,
+    # SQS constants
+    CHUCK_THRESHOLD,
+    OPEN_MISS_MULT,
+    CONTESTED_MISS_MULT,
+    SELF_CREATED_MULT,
+    ASSISTED_DEMERIT,
+    XEFG_AT_RIM,
+    XEFG_PAINT_NON_RIM,
+    XEFG_MID_RANGE,
+    XEFG_CORNER_3,
+    XEFG_ABOVE_BREAK_3,
+    XEFG_BACKCOURT,
+    CHUCK_PENALTY_EXP,
+    CHUCK_PENALTY_MULT,
+    SQS_ZERO_SHOTS_BASELINE,
+    SQS_SC_XEFG_THRESHOLD,
+    SQS_AST_XEFG_THRESHOLD,
 )
 
 
@@ -795,25 +812,195 @@ def compute_fds(row: pd.Series, foul_drawn_index: dict) -> dict:
     )
 
 
-# ─── SUB-SCORE STUBS ──────────────────────────────────────────────────────────
+# ─── SUB-SCORE: SQS ───────────────────────────────────────────────────────────
 
-def compute_sqs(row: pd.Series, shots: pd.DataFrame) -> float:
-    """Shot Quality Score — TODO."""
-    raise NotImplementedError("SQS not yet implemented")
+_XEFG_TABLE: dict[str, float] = {
+    "restricted area":        XEFG_AT_RIM,
+    "in the paint (non-ra)":  XEFG_PAINT_NON_RIM,
+    "mid-range":              XEFG_MID_RANGE,
+    "left corner 3":          XEFG_CORNER_3,
+    "right corner 3":         XEFG_CORNER_3,
+    "above the break 3":      XEFG_ABOVE_BREAK_3,
+    "backcourt":              XEFG_BACKCOURT,
+}
+
+
+def _zone_to_xefg(zone: str) -> float:
+    return _XEFG_TABLE.get(zone.lower().strip(), XEFG_MID_RANGE)
+
+
+def build_sqs_data(shots: pd.DataFrame, pbp: pd.DataFrame) -> dict[int, list[dict]]:
+    """
+    Build per-player shot lists for SQS, cross-referencing the shot chart with
+    PBP to determine whether each made shot was assisted.
+
+    Shots are stored in chronological order (earlier first within each period)
+    so that the cumulative chuck counter is applied in game sequence.
+
+    Returns {player_id: [{"zone", "xefg", "made", "assisted", ...}, ...]}
+    """
+    # Build assisted lookup from PBP made shots
+    # Key: (period, personId, minutes_remaining, seconds_remaining) → bool
+    assisted_lookup: dict[tuple, bool] = {}
+    for _, play in pbp.iterrows():
+        if int(play.get("isFieldGoal", 0)) != 1:
+            continue
+        if str(play.get("actionType", "")).lower().strip() != "made shot":
+            continue
+        try:
+            pid    = int(play.get("personId", 0))
+            period = int(play.get("period", 0))
+        except (TypeError, ValueError):
+            continue
+        min_r, sec_r = _parse_pbp_clock(play.get("clock", ""))
+        if min_r < 0:
+            continue
+        desc = str(play.get("description", ""))
+        assisted_lookup[(period, pid, min_r, sec_r)] = bool(re.search(r'\d+ AST\)', desc))
+
+    # Process shot chart in chronological order (period asc, time desc = earlier first)
+    try:
+        shots_sorted = shots.sort_values(
+            ["PERIOD", "MINUTES_REMAINING", "SECONDS_REMAINING"],
+            ascending=[True, False, False],
+        ).reset_index(drop=True)
+    except KeyError:
+        shots_sorted = shots.reset_index(drop=True)
+
+    result: dict[int, list[dict]] = {}
+    for _, shot in shots_sorted.iterrows():
+        try:
+            pid    = int(shot["PLAYER_ID"])
+            period = int(shot["PERIOD"])
+            min_r  = int(shot["MINUTES_REMAINING"])
+            sec_r  = int(shot["SECONDS_REMAINING"])
+        except (KeyError, TypeError, ValueError):
+            continue
+
+        zone = str(shot.get("SHOT_ZONE_BASIC", ""))
+        xefg = _zone_to_xefg(zone)
+        made = (int(shot.get("SHOT_MADE_FLAG", 0)) == 1)
+
+        # Assisted only possible on made shots; tolerates ±2-second PBP clock drift
+        assisted = False
+        if made:
+            for s_off in (0, 1, -1, 2, -2):
+                adj = sec_r + s_off
+                if adj < 0:
+                    continue
+                key = (period, pid, min_r, adj)
+                if key in assisted_lookup:
+                    assisted = assisted_lookup[key]
+                    break
+
+        result.setdefault(pid, []).append({
+            "zone":     zone,
+            "xefg":     xefg,
+            "made":     made,
+            "assisted": assisted,
+            "period":   period,
+            "min":      min_r,
+            "sec":      sec_r,
+        })
+
+    return result
+
+
+def compute_sqs(row: pd.Series, sqs_data: dict) -> dict:
+    """
+    Shot Quality Score for one player (EHI ref §1).
+
+    sqs_data : output of build_sqs_data(shots, pbp)
+
+    Per-shot score:
+      Made shot               → xeFG% × 100 × 1.0
+      Missed, xeFG% ≥ 0.38   → xeFG% × 100 × 0.85  (OPEN_MISS_MULT)
+      Missed, xeFG% < 0.38   → xeFG% × 100 × 0.50  (CONTESTED_MISS_MULT)
+                                − (chuck_count ^ 1.4) × 3  (cumulative penalty)
+    Self-created bonus  : ×1.25 if assisted=False, made=True, xeFG% ≥ 0.50
+    Assisted demerit    : ×0.90 if assisted=True,  xeFG% < 0.45
+    SQS = clamp(mean(shot_scores), 0, 100)
+    Zero shots → SQS_ZERO_SHOTS_BASELINE (50)
+    """
+    pid   = int(row["personId"])
+    shots = sqs_data.get(pid, [])
+
+    if not shots:
+        return dict(
+            shot_details=[],
+            n_shots=0,
+            n_chucks=0,
+            raw_mean=float(SQS_ZERO_SHOTS_BASELINE),
+            SQS=float(SQS_ZERO_SHOTS_BASELINE),
+            note="zero shots → 50",
+        )
+
+    chuck_count = 0
+    shot_details: list[dict] = []
+
+    for s in shots:
+        xefg     = s["xefg"]
+        made     = s["made"]
+        assisted = s["assisted"]
+        is_chuck = False
+        chuck_num = 0
+
+        base = xefg * 100.0
+
+        if made:
+            shot_score = base * 1.0
+        elif xefg >= CHUCK_THRESHOLD:
+            shot_score = base * OPEN_MISS_MULT
+        else:
+            chuck_count += 1
+            is_chuck    = True
+            chuck_num   = chuck_count
+            shot_score  = base * CONTESTED_MISS_MULT
+            shot_score -= (chuck_count ** CHUCK_PENALTY_EXP) * CHUCK_PENALTY_MULT
+
+        # Self-created bonus (requires made, unassisted, quality zone)
+        if not assisted and made and xefg >= SQS_SC_XEFG_THRESHOLD:
+            shot_score *= SELF_CREATED_MULT
+
+        # Assisted demerit (low-quality assisted catch-and-shoot)
+        if assisted and xefg < SQS_AST_XEFG_THRESHOLD:
+            shot_score *= ASSISTED_DEMERIT
+
+        shot_details.append({
+            "zone":      s["zone"],
+            "xefg":      xefg,
+            "made":      made,
+            "assisted":  assisted,
+            "is_chuck":  is_chuck,
+            "chuck_num": chuck_num,
+            "shot_score": round(shot_score, 2),
+        })
+
+    raw_mean = sum(d["shot_score"] for d in shot_details) / len(shot_details)
+    sqs      = clamp(raw_mean)
+
+    return dict(
+        shot_details=shot_details,
+        n_shots=len(shots),
+        n_chucks=chuck_count,
+        raw_mean=round(raw_mean, 2),
+        SQS=round(sqs, 2),
+        note="",
+    )
 
 
 # ─── MAIN COMPUTE ─────────────────────────────────────────────────────────────
 
 def compute_all(data: dict) -> tuple[pd.DataFrame, dict]:
     """
-    Compute all implemented EHI sub-scores for every active player.
+    Compute all EHI sub-scores for every active player.
 
     data : dict returned by pipeline.main()
 
     Returns
     -------
     df      : DataFrame with one row per player and all sub-score columns.
-    detail  : {"fds": {personId: compute_fds_result_dict}} for validation reports.
+    detail  : {"fds": {personId: fds_dict}, "sqs": {personId: sqs_dict}}
     """
     box    = data["player_box"].copy()
     pbp    = data["pbp"]
@@ -823,22 +1010,35 @@ def compute_all(data: dict) -> tuple[pd.DataFrame, dict]:
     box["minutes_dec"] = box["minutes"].apply(parse_minutes)
     active = box[box["minutes_dec"] > 0].copy().reset_index(drop=True)
 
-    # Build PBP indices once — O(n_plays) each, not O(n_players × n_plays)
+    # Build all game-wide indices once — O(n_plays / n_shots), not per-player
     violation_index  = build_violation_index(pbp)
     foul_type_index  = build_foul_type_index(pbp)
     foul_drawn_index = build_foul_drawn_events(pbp, shots)
+    sqs_data         = build_sqs_data(shots, pbp)
 
     records    = []
-    fds_detail = {}         # {personId: compute_fds result dict}
+    fds_detail = {}
+    sqs_detail = {}
 
     for _, row in active.iterrows():
         ftp = compute_ftp(row)
         sps = compute_sps(row, violation_index)
         des = compute_des(row, hustle, foul_type_index)
         fds = compute_fds(row, foul_drawn_index)
+        sqs = compute_sqs(row, sqs_data)
 
         pid = int(row["personId"])
         fds_detail[pid] = fds
+        sqs_detail[pid] = sqs
+
+        ehi = round(
+            W_SQS * sqs["SQS"]
+            + W_FDS * fds["FDS"]
+            + W_FTP * ftp["FTP"]
+            + W_SPS * sps["SPS"]
+            + W_DES * des["DES"],
+            2,
+        )
 
         records.append({
             # ── Identity ──────────────────────────────────────────────────
@@ -896,12 +1096,17 @@ def compute_all(data: dict) -> tuple[pd.DataFrame, dict]:
             "fds_ft_mod":   fds["ft_mod"],
             "FDS":          fds["FDS"],
             "fds_note":     fds["note"],
-            # ── SQS stub ──────────────────────────────────────────────────
-            "SQS": float("nan"),
-            "EHI": float("nan"),
+            # ── SQS ───────────────────────────────────────────────────────
+            "sqs_shots":    sqs["n_shots"],
+            "sqs_chucks":   sqs["n_chucks"],
+            "sqs_raw":      sqs["raw_mean"],
+            "SQS":          sqs["SQS"],
+            "sqs_note":     sqs["note"],
+            # ── EHI ───────────────────────────────────────────────────────
+            "EHI": ehi,
         })
 
-    return pd.DataFrame(records), {"fds": fds_detail}
+    return pd.DataFrame(records), {"fds": fds_detail, "sqs": sqs_detail}
 
 
 # ─── VALIDATION DISPLAY ───────────────────────────────────────────────────────
@@ -1234,6 +1439,208 @@ def print_fds_classification_report(
     print("=" * W)
 
 
+def print_sqs_report(
+    df: pd.DataFrame,
+    sqs_detail: dict,
+    target_name: str = "Bam Adebayo",
+) -> None:
+    """
+    1. Full per-shot breakdown for target_name (zone, xeFG%, result, assisted, score).
+    2. SQS summary for every player sorted by team then SQS descending.
+    """
+    # Resolve target player
+    target_lower = target_name.lower()
+    target_pid   = None
+    for _, r in df.iterrows():
+        if target_lower in r["player"].lower():
+            target_pid = int(r["personId"])
+            break
+
+    W = 105
+    print("\n" + "=" * W)
+    print(f"SQS — Shot Quality Score  |  Per-shot breakdown: {target_name}")
+    print("=" * W)
+
+    if target_pid is not None and target_pid in sqs_detail:
+        res    = sqs_detail[target_pid]
+        details = res["shot_details"]
+        pr     = df[df["personId"] == target_pid].iloc[0]
+        print(
+            f"  {pr['player']}  SQS={pr['SQS']:.1f}"
+            f"  shots={res['n_shots']}  chucks={res['n_chucks']}"
+            f"  raw_mean={res['raw_mean']:.2f}"
+        )
+        print()
+        print(
+            f"  {'#':>3}  {'Zone':<26}  {'xeFG%':>6}  {'Result':>6}"
+            f"  {'Ast':>4}  {'Chuck':>6}  {'Score':>7}  Notes"
+        )
+        print("  " + "─" * (W - 4))
+
+        for k, s in enumerate(details, 1):
+            result_str = "MAKE" if s["made"] else "miss"
+            ast_str    = "Y"    if s["assisted"] else "-"
+            chuck_str  = f"#{s['chuck_num']}" if s["is_chuck"] else "-"
+            notes: list[str] = []
+            if s["is_chuck"]:
+                notes.append(f"chuck pen={(s['chuck_num'] ** CHUCK_PENALTY_EXP * CHUCK_PENALTY_MULT):.2f}")
+            if not s["assisted"] and s["made"] and s["xefg"] >= SQS_SC_XEFG_THRESHOLD:
+                notes.append("SC×1.25")
+            if s["assisted"] and s["xefg"] < SQS_AST_XEFG_THRESHOLD:
+                notes.append("ast×0.90")
+            print(
+                f"  {k:>3}  {s['zone']:<26}  {s['xefg']:>5.2f}  {result_str:>6}"
+                f"  {ast_str:>4}  {chuck_str:>6}  {s['shot_score']:>7.2f}  {', '.join(notes)}"
+            )
+        print("  " + "─" * (W - 4))
+    else:
+        print(f"  (No shot data found for '{target_name}')")
+
+    # ── All-player SQS table ───────────────────────────────────────────────────
+    print()
+    print("=" * W)
+    print("SQS — All Players")
+    print("=" * W)
+    df_s = df.copy()
+    df_s["_order"] = (df_s["team"] != "MIA").astype(int)
+    df_s = df_s.sort_values(["_order", "SQS"], ascending=[True, False]).drop(columns="_order")
+
+    print(
+        f"  {'Player':<22}{'Tm':>4}{'MIN':>6}{'FGA':>5}"
+        f"{'shots':>7}{'chucks':>7}{'raw':>7}{'SQS':>7}  Note"
+    )
+    print("  " + "─" * 70)
+    for _, r in df_s.iterrows():
+        pid    = int(r["personId"])
+        detail = sqs_detail.get(pid, {})
+        note   = detail.get("note", "")
+        print(
+            f"  {r['player']:<22}{r['team']:>4}{r['min']:>6.1f}{r['fga']:>5}"
+            f"{int(r['sqs_shots']):>7}{int(r['sqs_chucks']):>7}"
+            f"{r['sqs_raw']:>7.1f}{r['SQS']:>7.1f}  {note}"
+        )
+
+    print("  " + "─" * 70)
+    for team, grp in df_s.groupby("team", sort=False):
+        print(f"  {team} avg SQS: {grp['SQS'].mean():.1f}   (n={len(grp)})")
+    print(f"  Game avg SQS : {df_s['SQS'].mean():.1f}")
+    print("=" * W)
+
+
+def print_ehi_leaderboard(df: pd.DataFrame) -> None:
+    """
+    Final EHI leaderboard — all players sorted by EHI descending.
+    Shows every raw sub-score beside the weighted total.
+    """
+    df_s = df.sort_values("EHI", ascending=False).reset_index(drop=True)
+
+    W = 108
+    print("\n" + "=" * W)
+    print("EHI — Final Leaderboard")
+    print(f"  EHI = {W_SQS}×SQS + {W_FDS}×FDS + {W_FTP}×FTP + {W_SPS}×SPS + {W_DES}×DES")
+    print("=" * W)
+    print(
+        f"  {'Rk':>3}  {'Player':<22}{'Tm':>4}{'MIN':>6}"
+        f"{'SQS':>7}{'FDS':>7}{'FTP':>7}{'SPS':>7}{'DES':>7}"
+        f"  │{'EHI':>7}"
+    )
+    print("  " + "─" * (W - 2))
+
+    for rank, (_, r) in enumerate(df_s.iterrows(), 1):
+        print(
+            f"  {rank:>3}  {r['player']:<22}{r['team']:>4}{r['min']:>6.1f}"
+            f"{r['SQS']:>7.1f}{r['FDS']:>7.1f}{r['FTP']:>7.1f}"
+            f"{r['SPS']:>7.1f}{r['DES']:>7.1f}"
+            f"  │{r['EHI']:>7.2f}"
+        )
+
+    print("  " + "─" * (W - 2))
+    for team, grp in df_s.groupby("team", sort=False):
+        print(
+            f"  {team} avg — "
+            f"SQS:{grp['SQS'].mean():.1f}  FDS:{grp['FDS'].mean():.1f}"
+            f"  FTP:{grp['FTP'].mean():.1f}  SPS:{grp['SPS'].mean():.1f}"
+            f"  DES:{grp['DES'].mean():.1f}  EHI:{grp['EHI'].mean():.2f}"
+        )
+    print(
+        f"  Game avg — "
+        f"SQS:{df_s['SQS'].mean():.1f}  FDS:{df_s['FDS'].mean():.1f}"
+        f"  FTP:{df_s['FTP'].mean():.1f}  SPS:{df_s['SPS'].mean():.1f}"
+        f"  DES:{df_s['DES'].mean():.1f}  EHI:{df_s['EHI'].mean():.2f}"
+    )
+    print("=" * W)
+
+
+def print_bam_breakdown(df: pd.DataFrame, target_name: str = "Bam Adebayo") -> None:
+    """
+    Dedicated EHI component breakdown for one player.
+    Shows raw score, weight, weighted contribution, max possible contribution,
+    and a proportional bar (filled = actual / max possible for that component).
+    """
+    target_lower = target_name.lower()
+    match = df[df["player"].str.lower().str.contains(target_lower)]
+    if match.empty:
+        print(f"\n  (Player '{target_name}' not found in results.)")
+        return
+    r = match.iloc[0]
+
+    components = [
+        ("SQS", W_SQS, r["SQS"]),
+        ("FDS", W_FDS, r["FDS"]),
+        ("FTP", W_FTP, r["FTP"]),
+        ("SPS", W_SPS, r["SPS"]),
+        ("DES", W_DES, r["DES"]),
+    ]
+
+    BAR_W  = 22   # total bar chars
+    MAX_EHI = 100.0
+
+    W = 80
+    print("\n" + "=" * W)
+    print(f"EHI — {r['player']} ({r['team']})  Component Breakdown")
+    print(f"  {r['min']:.1f} MIN   {int(r['pts'])} PTS   {int(r['fga'])} FGA   {int(r['fta'])} FTA")
+    print(f"  EHI = {W_SQS}×SQS + {W_FDS}×FDS + {W_FTP}×FTP + {W_SPS}×SPS + {W_DES}×DES")
+    print("=" * W)
+    print(
+        f"  {'Component':<12}{'Weight':>7}{'Raw':>8}{'Contrib':>9}"
+        f"{'MaxPoss':>9}  Bar (contrib / max)"
+    )
+    print("  " + "─" * (W - 2))
+
+    total_contrib = 0.0
+    for name, weight, raw in components:
+        contrib  = weight * raw
+        max_poss = weight * 100.0
+        filled   = round((contrib / max_poss) * BAR_W) if max_poss > 0 else 0
+        bar      = "█" * filled + "░" * (BAR_W - filled)
+        total_contrib += contrib
+        print(
+            f"  {name:<12}{weight:>7.2f}{raw:>8.1f}{contrib:>9.2f}"
+            f"{max_poss:>9.2f}  {bar}"
+        )
+
+    print("  " + "─" * (W - 2))
+    grand_bar_filled = round((total_contrib / MAX_EHI) * BAR_W)
+    grand_bar        = "█" * grand_bar_filled + "░" * (BAR_W - grand_bar_filled)
+    print(
+        f"  {'EHI':<12}{'1.00':>7}{'-':>8}{total_contrib:>9.2f}"
+        f"{'100.00':>9}  {grand_bar}"
+    )
+    print("=" * W)
+
+    # Per-component % share of the actual EHI total
+    print(f"\n  Contribution share (of EHI {total_contrib:.2f}):")
+    for name, weight, raw in components:
+        contrib = weight * raw
+        share   = (contrib / total_contrib * 100) if total_contrib > 0 else 0
+        gap     = (weight * 100.0) - contrib       # points left on table vs perfect score
+        print(
+            f"    {name}  {contrib:5.2f} pts  ({share:5.1f}% of EHI)"
+            f"  [{gap:+.2f} vs max {weight*100:.0f}]"
+        )
+    print()
+
+
 # ─── ENTRY POINT ──────────────────────────────────────────────────────────────
 
 if __name__ == "__main__":
@@ -1245,3 +1652,6 @@ if __name__ == "__main__":
     print_sps_report(results)
     print_des_report(results)
     print_fds_report(results, detail["fds"])
+    print_sqs_report(results, detail["sqs"])
+    print_ehi_leaderboard(results)
+    print_bam_breakdown(results)

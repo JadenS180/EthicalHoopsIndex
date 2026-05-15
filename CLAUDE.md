@@ -67,8 +67,8 @@ Consumes the dict from `pipeline.main()` and computes EHI sub-scores for every a
 - `build_violation_index(pbp)` scans the PBP once and returns `{personId: {vtype: count}}`
 - Constants: `TECH_PENALTY`, `FLAGRANT1_PENALTY`, `FLAGRANT2_PENALTY`, `ILLEGAL_SCREEN_PEN`, `DELAY_PENALTY`, `SPS_STACK_EXP`
 
-### Stubs (not yet implemented)
-`compute_sqs`, `compute_fds`, `compute_des` — each raises `NotImplementedError`.
+### All sub-scores implemented
+All five sub-scores are complete. No stubs remain.
 
 ### Validation helpers
 - `print_ftp_report(df)` — shows all intermediates (ft_pts, fg_pts, ft_dep%, raw, penalty, FTP); includes a spot-check that computed `total_pts` matches box-score `pts`
@@ -84,7 +84,8 @@ Sub-scores are built and validated one at a time before moving to the next:
 - [x] SPS — complete, validated (Coulibaly 1 tech → SPS 82.0 confirmed)
 - [x] DES — complete, validated
 - [x] FDS — complete, validated (Bam 43-FTA game → FDS 0.0 confirmed; volume_penalty 332.2 dominates)
-- [ ] SQS — next; requires shot-level xeFG% lookup table; most complex
+- [x] SQS — complete, validated (Bam 83-pt game; per-shot breakdown printed)
+- [x] EHI aggregation — complete; `print_ehi_leaderboard` + `print_bam_breakdown` added; Bam ranks 19/21 (EHI 53.09), FDS=0.0 dominant drag
 
 ---
 

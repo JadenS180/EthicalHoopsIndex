@@ -2,7 +2,8 @@
   "permissions": {
     "allow": [
       "Bash(python3 *)",
-      "Bash(grep -A 120 \"FDS — Foul Drawing Score$\")"
+      "Bash(grep -A 120 \"FDS — Foul Drawing Score$\")",
+      "Bash(python *)"
     ]
   }
 }
