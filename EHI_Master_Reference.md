@@ -105,20 +105,27 @@ Each foul drawn that results in FTA gets a legitimacy score (0.0–1.0):
 ```python
 legitimacy = 0.0
 
-# Positive signals
-if defender_distance <= 2ft:   legitimacy += 0.40
-if defender_distance <= 4ft:   legitimacy += 0.25
+# Defender proximity (from PlayerDashPtShots season-level bucket distribution)
+# prox_bonus = very_tight_pct * 0.40 + tight_pct * 0.25
+# Fallback: +0.25 flat if no proximity data available for the player
+if not off_ball_foul:
+    legitimacy += prox_bonus   # ranges ~0.08–0.40 depending on player's shot profile
+
+# Other positive signals
 if assisted (catch-and-shoot): legitimacy += 0.20
 if and_1 (made + fouled):      legitimacy += 0.20
 
-# Negative signals
-if defender_distance > 4ft:              legitimacy -= 0.35
-if 3rd+ foul of same type this game:     legitimacy -= 0.20
-if 4th+ foul of same type this game:     legitimacy -= 0.30
+# Repetition penalties (same foul subtype within the game)
+if 3rd foul of same type this game:  legitimacy -= 0.20
+if 4th+ foul of same type this game: legitimacy -= 0.30
 
-# Hard cap for off-ball fouls
+# Hard cap for off-ball fouls (personal / loose-ball in bonus)
 if off_ball_foul:
     legitimacy = min(legitimacy, 0.45)
+
+# Garbage time cap (Q4, lead ≥ 20, ≤ 5 min left)
+if garbage_time:
+    legitimacy = min(legitimacy, 0.20)
 
 # Global clamp
 legitimacy = clamp(legitimacy, 0.0, 1.0)
@@ -130,11 +137,8 @@ legitimacy = clamp(legitimacy, 0.0, 1.0)
 avg_legitimacy = mean(all foul legitimacy scores)
 FTA_in_game = total free throw attempts
 
-# Volume penalty (even legitimate FT volume is mildly penalized)
-volume_penalty = (FTA_in_game ^ 1.3) * 2.5
-
 FDS_raw = avg_legitimacy * 100
-FDS = clamp(FDS_raw - volume_penalty, 0, 100)
+FDS = clamp(FDS_raw, 0, 100)
 
 # FT% modifier
 if FTM / FTA < 0.60 and FTA >= 4:
@@ -145,16 +149,7 @@ if FTA_in_game == 0:
     FDS = 72
 ```
 
-### Volume Penalty Reference
-
-| FTA | Penalty |
-|---|---|
-| 0 | 0 (baseline 72) |
-| 2 | ~7 pts |
-| 4 | ~17 pts |
-| 6 | ~28 pts |
-| 8 | ~40 pts |
-| 12 | ~63 pts |
+> **Note (calibration 2025-05):** Volume penalty (`FTA^1.3 × 2.5`) was removed after 12-game validation showed it zeroed out FDS for all high-FTA star players regardless of legitimacy quality. Legitimacy signals alone now fully determine FDS.
 
 ---
 
@@ -339,25 +334,40 @@ if garbage_FTA_ratio > 0.30:
 
 | Data | Source | Endpoint |
 |---|---|---|
-| Shot location, distance, defender distance | `nba_api` | `shotchartdetail`, `defenderdashptsshots` |
-| Assisted vs self-created | `nba_api` | Play-by-play + assist tracking |
-| FTA, FTM, FGM breakdown | `nba_api` | Box score |
-| Foul type classification | `nba_api` | Play-by-play (text descriptions) |
-| Technical / flagrant fouls | `nba_api` | Play-by-play |
-| Official flop violations | NBA.com | Published foul reports (V2) |
-| Contested shots, deflections, charges | `nba_api` | `hustlestats` endpoint |
-| Blocks, steals, rebounds | `nba_api` | Box score |
+| Shot location, zone, made/missed | `nba_api` | `ShotChartDetail` (player_id=0, per team) |
+| Defender proximity (FDS legitimacy) | `nba_api` | `PlayerDashPtShots` result set [4] — `CLOSE_DEF_DIST_RANGE` buckets, season-level |
+| Assisted vs self-created | `nba_api` | `PlayByPlayV3` + assist cross-reference |
+| FTA, FTM, FGM breakdown | `nba_api` | `BoxScoreTraditionalV3` |
+| Foul type classification | `nba_api` | `PlayByPlayV3` (actionType / subType / description) |
+| Technical / flagrant fouls | `nba_api` | `PlayByPlayV3` |
+| Official flop violations | NBA.com | Published foul reports (V2 — not yet integrated) |
+| Contested shots, deflections, charges | `nba_api` | `BoxScoreHustleV2` |
+| Blocks, steals, rebounds | `nba_api` | `BoxScoreTraditionalV3` |
 
 ---
 
-## Validation Strategy
+## Validation Status
 
-Before finalizing weights, validate against **10–15 games** with strong public consensus on player ethics:
+Initial validation complete across **12 games** (stored in `ehi.db`). Star player results (sorted by EHI):
 
-1. Select games where a player was widely labeled "dirty" or "ethical"
-2. Run EHI and check if scores agree with consensus
-3. Adjust weights and penalty constants until alignment is strong
-4. Run **sensitivity analysis** — vary weights ±5% and confirm rankings are stable
+| Player | Game | Pts | FDS | EHI |
+|---|---|---|---|---|
+| Giannis Antetokounmpo | MIL vs NYK 12/23/2023 | 28 | 21.4 | 63.8 |
+| Luka Dončić | DAL vs ATL 01/26/2024 | 73 | 3.1 | 63.3 |
+| Victor Wembanyama | SAS vs DAL 10/22/2025 | 40 | 12.6 | 60.8 |
+| Stephen Curry | GSW vs POR 01/03/2021 | 62 | 3.4 | 60.0 |
+| Tyrese Maxey | MIL vs PHI 11/20/2025 | 54 | 7.4 | 59.8 |
+| Donovan Mitchell | LAL vs CLE 03/31/2026 | 10 | 31.8 | 58.6 |
+| Kawhi Leonard | DET vs LAC 12/28/2025 | 55 | 8.7 | 58.6 |
+| James Harden | HOU vs NYK 01/23/2019 | 61 | 6.8 | 58.0 |
+| Alperen Sengun | HOU vs OKC 10/21/2025 | 39 | 9.8 | 56.3 |
+| Nikola Jokić | MIN vs DEN 04/01/2025 | 61 | 13.9 | 56.3 |
+| Cade Cunningham | DET vs WAS 11/10/2025 | 46 | 6.9 | 54.8 |
+| Shai Gilgeous-Alexander | IND vs OKC 10/23/2025 | 55 | 3.8 | 53.7 |
+
+**EHI range: 53.7–63.8 · std dev: 3.12 · mean: 58.7**
+
+Next steps: expand to games with known bad actors, test SPS penalties on flagrant foul games, sensitivity analysis on weights.
 
 ---
 
@@ -380,8 +390,8 @@ OPEN_MISS_MULT    = 0.85
 CONTESTED_MISS_MULT = 0.50
 
 # FDS
-VOLUME_PENALTY_BASE = 2.5
-VOLUME_PENALTY_EXP  = 1.3
+VOLUME_PENALTY_BASE = 1.0   # DEPRECATED — not applied; kept for reference
+VOLUME_PENALTY_EXP  = 1.15  # DEPRECATED — not applied; kept for reference
 FT_PCT_THRESHOLD    = 0.60
 FT_PCT_MODIFIER     = 0.92
 ZERO_FTA_BASELINE   = 72

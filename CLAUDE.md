@@ -15,7 +15,7 @@ EHI = 0.35(SQS) + 0.20(FDS) + 0.20(FTP) + 0.15(SPS) + 0.10(DES)
 | Code | Name | Weight | What it measures |
 |------|------|--------|-----------------|
 | SQS | Shot Quality Score | 35% | Did the player take shots a skilled, ethical player would take? Rewards contested makes and self-created quality looks; penalizes low-xeFG% chucks. |
-| FDS | Foul Drawing Score | 20% | Did the player earn their free throws or manufacture them? Scores legitimacy per foul drawn; applies volume penalty even for legitimate FTAs. |
+| FDS | Foul Drawing Score | 20% | Did the player earn their free throws or manufacture them? Scores legitimacy per foul drawn; `FDS = clamp(avg_legitimacy × 100)` plus FT% modifier. No volume penalty. |
 | FTP | FT Dependency Score | 20% | What fraction of points came from free throws vs. field goals? Penalizes exponentially above 50% dependency. |
 | SPS | Sportsmanship Score | 15% | Did the player conduct themselves with integrity? Starts at 100; penalties only. Exponential stacking per violation type. |
 | DES | Defensive Effort Score | 10% | Did the player compete defensively? Weighted sum of contested shots, deflections, steals, blocks, defensive rebounds, charges taken; minus foul penalty. |
@@ -28,7 +28,7 @@ All constants (weights, thresholds, multipliers) live in `config.py`.
 
 Pulls all raw data for a single game from `nba_api` and returns it as a dict of pandas DataFrames. Currently configured for **Bam Adebayo's 83-point game — Heat vs Wizards, 2026-03-10 (game_id `0022500938`)**.
 
-**6 API calls in order (1-second sleep between each):**
+**7 API calls in order (1-second sleep between each):**
 
 1. `LeagueGameFinder` — locates the game ID by filtering Heat games on 03/10/2026
 2. `BoxScoreSummaryV3` — game-level metadata (score, officials, line score)
@@ -36,8 +36,9 @@ Pulls all raw data for a single game from `nba_api` and returns it as a dict of 
 4. `PlayByPlayV3` — full play log (569 rows); `actionType`, `subType`, `description` fields carry foul classification
 5. `ShotChartDetail` × 2 — one call per team with `player_id=0`; returns `SHOT_DISTANCE`, `SHOT_ZONE_*`, `EVENT_TYPE`, `ACTION_TYPE`, `LOC_X/Y`
 6. `BoxScoreHustleV2` — per-player hustle stats for all players
+7. `PlayerDashPtShots` × 2 — one call per team with `player_id=0`; result set `[4]` provides `CLOSE_DEF_DIST_RANGE` buckets (0-2ft, 2-4ft, 4-6ft, 6ft+) per player for the full season (per-game date filtering returns 0 rows; season-level used as proxy)
 
-**Returns:** `{"game_id", "game_summary", "player_box", "pbp", "shots", "hustle"}`
+**Returns:** `{"game_id", "game_summary", "player_box", "pbp", "shots", "hustle", "proximity"}`
 
 **Headers:** The NBA stats API silently times out on outdated User-Agents. `config.py` uses Chrome 145 and `NBAStatsHTTP.headers` is patched globally at import time — do not pass `headers=` per endpoint.
 
@@ -83,9 +84,9 @@ Sub-scores are built and validated one at a time before moving to the next:
 - [x] FTP — complete, validated
 - [x] SPS — complete, validated (Coulibaly 1 tech → SPS 82.0 confirmed)
 - [x] DES — complete, validated
-- [x] FDS — complete, validated (Bam 43-FTA game → FDS 0.0 confirmed; volume_penalty 332.2 dominates)
+- [x] FDS — complete, validated; volume penalty removed after 12-game calibration (all stars scored FDS=0 at any config); FDS now = `clamp(avg_legitimacy × 100)` + FT% modifier
 - [x] SQS — complete, validated (Bam 83-pt game; per-shot breakdown printed)
-- [x] EHI aggregation — complete; `print_ehi_leaderboard` + `print_bam_breakdown` added; Bam ranks 19/21 (EHI 53.09), FDS=0.0 dominant drag
+- [x] EHI aggregation — complete; validated across 12 games (EHI range 53.7–63.8, std dev 3.12)
 
 ---
 
@@ -95,4 +96,6 @@ Sub-scores are built and validated one at a time before moving to the next:
 
 **Illegal screen and delay of game not tested:** This game (Heat vs Wizards 2026-03-10) contains no illegal screen calls or delay-of-game violations. The SPS matchers for those two types are written defensively but have not been exercised against real data. Validate against a game with a known illegal screen before trusting those branches.
 
-**FDS defender distance — V2 improvement:** `build_foul_drawn_events` does not have access to defender proximity data (`DefenderDashPtShots` endpoint). The `+0.25 defender ≤4ft` signal is assumed for all shooting fouls (a foul implies contact), and the `+0.40 defender ≤2ft` bonus is silently skipped. When `DefenderDashPtShots` data is added, plug actual distance into `compute_fds` to replace the assumed signal and unlock the full legitimacy range.
+**FDS defender proximity — implemented via `PlayerDashPtShots`:** `build_proximity_index(proximity_df)` in `compute_ehi.py` converts season-level `CLOSE_DEF_DIST_RANGE` bucket data into per-player `{very_tight_pct, tight_pct}` fractions. `compute_fds` applies `prox_bonus = very_tight_pct × 0.40 + tight_pct × 0.25` per shooting foul; falls back to `+0.25` flat if no data available. Season-level data used as game-level proxy because `PlayerDashPtShots` returns 0 rows when date-filtered to a single game.
+
+**FDS volume penalty — removed:** After 12-game validation, `VOLUME_PENALTY_BASE` and `VOLUME_PENALTY_EXP` are no longer applied. All high-FTA star players scored FDS=0 under every tested config (A/B/C) because legitimate avg_leg (~0.25–0.45) can never overcome the volume penalty at 40+ FTA. FDS now equals `clamp(avg_legitimacy × 100, 0, 100)` plus the FT% modifier, letting legitimacy quality fully determine the score.

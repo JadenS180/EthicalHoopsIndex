@@ -53,8 +53,8 @@ SQS_SC_XEFG_THRESHOLD    = 0.50   # min xeFG% for self-created bonus
 SQS_AST_XEFG_THRESHOLD   = 0.45   # max xeFG% for assisted demerit
 
 # ─── FDS CONSTANTS ──────────────────────────────────────────────────────────
-VOLUME_PENALTY_BASE = 2.5
-VOLUME_PENALTY_EXP  = 1.3
+VOLUME_PENALTY_BASE = 1.0    # DEPRECATED — removed after 12-game calibration; not applied in compute_fds
+VOLUME_PENALTY_EXP  = 1.15  # DEPRECATED — removed after 12-game calibration; not applied in compute_fds
 FT_PCT_THRESHOLD    = 0.60
 FT_PCT_MODIFIER     = 0.92
 ZERO_FTA_BASELINE   = 72

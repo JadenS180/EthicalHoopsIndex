@@ -665,16 +665,46 @@ def build_foul_drawn_events(pbp: pd.DataFrame, shots: pd.DataFrame) -> dict[int,
     return result
 
 
+# ─── PROXIMITY INDEX ─────────────────────────────────────────────────────────
+
+def build_proximity_index(proximity_df: pd.DataFrame) -> dict[int, dict]:
+    """
+    Build per-player defender proximity percentages from PlayerDashPtShots result set [4].
+
+    Returns {player_id: {"very_tight_pct": float, "tight_pct": float}}
+    where percentages are fraction of that player's FGA taken with a defender
+    in the 0-2ft (very tight) and 2-4ft (tight) buckets respectively.
+    """
+    if proximity_df.empty or "CLOSE_DEF_DIST_RANGE" not in proximity_df.columns:
+        return {}
+
+    result: dict[int, dict] = {}
+    for pid, grp in proximity_df.groupby("PLAYER_ID"):
+        total_fga = grp["FGA"].sum()
+        if total_fga == 0:
+            continue
+        row_map = {str(r["CLOSE_DEF_DIST_RANGE"]): int(r["FGA"]) for _, r in grp.iterrows()}
+        very_tight = row_map.get("0-2 Feet - Very Tight", 0)
+        tight      = row_map.get("2-4 Feet - Tight", 0)
+        result[int(pid)] = {
+            "very_tight_pct": very_tight / total_fga,
+            "tight_pct":      tight      / total_fga,
+        }
+    return result
+
+
 # ─── SUB-SCORE: FDS (Part 2 — scoring) ───────────────────────────────────────
 
-def compute_fds(row: pd.Series, foul_drawn_index: dict) -> dict:
+def compute_fds(row: pd.Series, foul_drawn_index: dict, proximity_index: dict | None = None) -> dict:
     """
     Foul Drawing Score for one player (EHI ref §2).
 
     foul_drawn_index : output of build_foul_drawn_events(pbp, shots)
 
     Per-foul legitimacy signals (0→1):
-      +0.25  defender ≤4ft assumed for shooting fouls (foul implies contact)
+      +0.40  defender 0-2ft (very tight) — from PlayerDashPtShots proximity distribution
+      +0.25  defender 2-4ft (tight) — same source; combined as weighted avg per player
+             Fallback: +0.25 flat assumed if no proximity data available.
       +0.20  assisted (catch-and-shoot, from PBP description)
       +0.20  and-1 (made shot + foul at same clock)
       −0.20  3rd foul of same subtype in this game
@@ -684,8 +714,7 @@ def compute_fds(row: pd.Series, foul_drawn_index: dict) -> dict:
 
     Aggregate:
       FDS_raw        = mean(legitimacy) × 100
-      volume_penalty = FTA^1.3 × 2.5
-      FDS            = clamp(FDS_raw − volume_penalty)
+      FDS            = clamp(FDS_raw)
       FT% modifier   = × 0.92 if FTM/FTA < 0.60 and FTA ≥ 4
 
     Returns dict with per_foul list and all intermediates.
@@ -710,6 +739,13 @@ def compute_fds(row: pd.Series, foul_drawn_index: dict) -> dict:
 
     events = foul_drawn_index.get(pid, [])
 
+    # Pre-compute proximity bonus for this player's shooting fouls
+    prox_data = (proximity_index or {}).get(pid)
+    if prox_data:
+        prox_bonus = prox_data["very_tight_pct"] * 0.40 + prox_data["tight_pct"] * 0.25
+    else:
+        prox_bonus = 0.25   # fallback: assume defender ≤4ft (contact implied)
+
     # Per-subtype counter for repetition penalty (incremented as we see each foul)
     type_counts: dict[str, int] = {}
     per_foul: list[dict] = []
@@ -728,11 +764,14 @@ def compute_fds(row: pd.Series, foul_drawn_index: dict) -> dict:
         leg     = 0.0
         signals: list[str] = []
 
-        # Defender proximity: a foul implies contact, so ≤4ft is assumed for
-        # all shooting fouls.  The ≤2ft bonus requires distance data we don't have.
+        # Defender proximity: use season-level PlayerDashPtShots bucket distribution
+        # as a per-player proxy. Fallback to flat +0.25 if no proximity data.
         if not off_ball:
-            leg += 0.25
-            signals.append("+0.25 dist≤4ft")
+            leg += prox_bonus
+            if prox_data:
+                signals.append(f"+{prox_bonus:.2f} prox(vt={prox_data['very_tight_pct']:.2f},t={prox_data['tight_pct']:.2f})")
+            else:
+                signals.append("+0.25 dist≤4ft(assumed)")
 
         if assisted:
             leg += 0.20
@@ -788,9 +827,8 @@ def compute_fds(row: pd.Series, foul_drawn_index: dict) -> dict:
     all_legs = [f["leg"] for f in per_foul]
     avg_leg  = (sum(all_legs) / len(all_legs)) if all_legs else 0.0
 
-    fds_raw        = avg_leg * 100.0
-    volume_penalty = (fta ** VOLUME_PENALTY_EXP) * VOLUME_PENALTY_BASE
-    fds            = clamp(fds_raw - volume_penalty)
+    fds_raw = avg_leg * 100.0
+    fds     = clamp(fds_raw)
 
     # FT% modifier
     ft_pct = ftm / fta
@@ -804,7 +842,7 @@ def compute_fds(row: pd.Series, foul_drawn_index: dict) -> dict:
         n_fouls_drawn=len(per_foul),
         avg_legitimacy=round(avg_leg, 4),
         fds_raw=round(fds_raw, 2),
-        volume_penalty=round(volume_penalty, 2),
+        volume_penalty=0.0,
         ft_pct=round(ft_pct, 4),
         ft_mod=ft_mod,
         FDS=round(clamp(fds), 2),
@@ -1015,6 +1053,8 @@ def compute_all(data: dict) -> tuple[pd.DataFrame, dict]:
     foul_type_index  = build_foul_type_index(pbp)
     foul_drawn_index = build_foul_drawn_events(pbp, shots)
     sqs_data         = build_sqs_data(shots, pbp)
+    proximity_df     = data.get("proximity", pd.DataFrame())
+    proximity_index  = build_proximity_index(proximity_df)
 
     records    = []
     fds_detail = {}
@@ -1024,7 +1064,7 @@ def compute_all(data: dict) -> tuple[pd.DataFrame, dict]:
         ftp = compute_ftp(row)
         sps = compute_sps(row, violation_index)
         des = compute_des(row, hustle, foul_type_index)
-        fds = compute_fds(row, foul_drawn_index)
+        fds = compute_fds(row, foul_drawn_index, proximity_index)
         sqs = compute_sqs(row, sqs_data)
 
         pid = int(row["personId"])

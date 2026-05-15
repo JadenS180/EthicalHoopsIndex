@@ -26,6 +26,7 @@ from nba_api.stats.endpoints import (
     playbyplayv3,
     shotchartdetail,
     boxscorehustlev2,
+    playerdashptshots,
 )
 from nba_api.stats.library.http import NBAStatsHTTP
 
@@ -252,6 +253,45 @@ def pull_hustle(game_id: str) -> pd.DataFrame:
     return hustle
 
 
+# ─── STEP 7: Defender proximity (PlayerDashPtShots, per team) ────────────────
+
+def pull_proximity(player_box: pd.DataFrame, season: str) -> pd.DataFrame:
+    """
+    PlayerDashPtShots result set [4] — CLOSE_DEF_DIST_RANGE per player.
+
+    Calls once per team with player_id=0 (returns all players on the team).
+    Season-level data is used as a proxy because per-game date filtering
+    returns 0 rows from this endpoint.
+
+    Returns a concatenated DataFrame with columns including PLAYER_ID and
+    CLOSE_DEF_DIST_RANGE.
+    """
+    team_ids = player_box["teamId"].dropna().unique().tolist()
+    frames: list[pd.DataFrame] = []
+
+    for idx, tid in enumerate(team_ids, 1):
+        print(f"Step 7 — PlayerDashPtShots (team {int(tid)}, {idx}/{len(team_ids)}) …")
+        try:
+            resp = playerdashptshots.PlayerDashPtShots(
+                player_id=0,
+                team_id=int(tid),
+                season=season,
+                per_mode_simple="Totals",
+                timeout=60,
+            )
+            _sleep()
+            df = resp.get_data_frames()[4]
+            print(f"  ✓ {len(df)} proximity rows for team {int(tid)}")
+            frames.append(df)
+        except Exception as exc:
+            _sleep()
+            print(f"  ! PlayerDashPtShots failed for team {int(tid)}: {exc}")
+
+    if frames:
+        return pd.concat(frames, ignore_index=True)
+    return pd.DataFrame()
+
+
 # ─── MAIN ─────────────────────────────────────────────────────────────────────
 
 def main() -> dict:
@@ -269,6 +309,12 @@ def main() -> dict:
     wizards_shots = pull_shot_chart(game_id, WIZARDS_ID, "Wizards")
     hustle        = pull_hustle(game_id)
 
+    # Infer season for proximity lookup
+    month, _day, year = (int(x) for x in GAME_DATE.split("/"))
+    season_start = year if month >= 9 else year - 1
+    season = f"{season_start}-{str(season_start + 1)[-2:]}"
+    proximity = pull_proximity(player_box, season)
+
     all_shots = pd.concat([heat_shots, wizards_shots], ignore_index=True)
 
     print()
@@ -281,6 +327,7 @@ def main() -> dict:
     print(f"    Heat shots          : {len(heat_shots)}")
     print(f"    Wizards shots       : {len(wizards_shots)}")
     print(f"  hustle stat rows      : {len(hustle)}")
+    print(f"  proximity rows        : {len(proximity)}")
     print("=" * 65)
 
     return {
@@ -290,6 +337,7 @@ def main() -> dict:
         "pbp":          pbp,            # pd.DataFrame — full play log
         "shots":        all_shots,      # pd.DataFrame — all FGA, both teams
         "hustle":       hustle,         # pd.DataFrame — hustle stats, all players
+        "proximity":    proximity,      # pd.DataFrame — defender distance buckets
     }
 
 
