@@ -4,7 +4,7 @@
 
 The **Ethical Hoops Index (EHI)** is a composite per-game metric that measures how "ethically" an NBA player performed. It rewards skill-based scoring, disciplined defense, and clean conduct, while penalizing manipulation, deception, and laziness.
 
-Sub-scores are **unclamped** — they can exceed 100 for exceptional performances. The sole exception is SPS which has a floor of 0. FTP is naturally bounded [0, 100] by formula construction. EHI inherits the same range and floats freely with the weighted sum. All players with fewer than 8 minutes are excluded from computation entirely.
+Sub-scores are **unclamped** — they can exceed 100 for exceptional performances. The sole exception is SPS, which has a floor of 0. FTP is naturally bounded [0, 100] by formula construction. EHI inherits the same float-freely behaviour from the weighted sum. All players with fewer than 8 minutes are excluded from computation entirely.
 
 ---
 
@@ -24,79 +24,92 @@ EHI = 0.45(SQS) + 0.20(FDS) + 0.25(FTP) + 0.05(SPS) + 0.05(DES)
 
 ---
 
-## Sub-Score 1: Shot Quality Score (SQS) — 35%
+## Sub-Score 1: Shot Quality Score (SQS) — 45%
 
 ### Goal
 Did this player take shots that a skilled, ethical player would take?
 
 ### Inputs (via `nba_api`)
-- Shot distance / zone
-- Defender distance at shot (open / lightly / tightly / very tightly contested)
-- Shot type (layup, mid-range, corner 3, above-break 3, pull-up, etc.)
-- Whether shot was assisted or self-created
-- Made / missed
-- xeFG% lookup table (historical make rate by location + contest level)
+- Shot zone / distance (ShotChartDetail — `SHOT_ZONE_BASIC`)
+- Whether shot was assisted or self-created (PlayByPlayV3 assist cross-reference)
+- Made / missed (ShotChartDetail — `SHOT_MADE_FLAG`)
+- xeFG% by zone (empirical from `ehi.db` shots table; hardcoded fallbacks)
 
-### xeFG% Reference Table (approximate)
+### xeFG% Reference Table
 
-| Shot Type | Defender Distance | xeFG% |
-|---|---|---|
-| At rim | Open | ~0.72 |
-| At rim | Tightly contested | ~0.54 |
-| Corner 3 | Open | ~0.58 |
-| Above-break 3 | Open | ~0.52 |
-| Long mid-range | Tightly contested | ~0.34 |
-| Pull-up 3 | Very tightly contested | ~0.28 |
+Zones with ≥ 50 shots in `ehi.db` use empirical values; all others fall back to hardcoded league averages. The table is rebuilt at import time from `compute_ehi._build_xefg_table()`.
+
+| Zone | Empirical (12-game, 2,216 shots) | Hardcoded Fallback | Active |
+|---|---|---|---|
+| Restricted Area | 0.6560 | 0.72 | empirical |
+| In the Paint (Non-RA) | 0.4500 | 0.54 | empirical |
+| Mid-Range | 0.4810 | 0.44 | empirical |
+| Left Corner 3 | 0.2750 | 0.58 | empirical |
+| Right Corner 3 | 0.3980 | 0.58 | empirical |
+| Above the Break 3 | 0.3620 | 0.52 | empirical |
+| Backcourt | — | 0.30 | hardcoded |
+
+> **Note:** Empirical values reflect a small validation sample and will shift substantially once the 2025-26 full-season run completes. The left corner 3 figure (0.275) is likely depressed by sample selection — treat with caution.
 
 ### Per-Shot Score Logic
 
 ```python
-# Open shot (defender_dist > 4ft)
+base = xeFG% * 100
+
 if made:
-    shot_score = xeFG% * 100 * 1.0
-if missed:
-    shot_score = xeFG% * 100 * 0.85   # slight haircut, right decision
+    shot_score = base * 1.0
 
-# Contested shot (defender_dist <= 4ft)
-if made:
-    shot_score = xeFG% * 100 * 1.40   # contested make multiplier
-if missed:
-    shot_score = xeFG% * 100 * 0.50   # bad shot + missed
+elif xeFG% >= 0.38:   # reasonable shot, just missed
+    shot_score = base * 0.85  # OPEN_MISS_MULT
 
-# Chuck penalty (bad shot + missed only)
-if xeFG% < 0.38 and missed:
-    chuck_penalty = (game_chuck_count ^ 1.4) * penalty_constant
-    shot_score -= chuck_penalty
+else:                 # chuck: bad shot + missed
+    chuck_count += 1
+    shot_score = base * 0.50  # CONTESTED_MISS_MULT
+    shot_score -= (chuck_count ^ 1.4) * 3  # cumulative penalty (CHUCK_PENALTY)
 
-# Self-created bonus
-if self_created and xeFG% >= 0.50 and made:
-    shot_score *= 1.25    # 25% bonus for skilled shot creation
+# Self-created bonus (unassisted make in a quality zone)
+if not assisted and made and xeFG% >= 0.50:
+    shot_score *= 1.25   # SELF_CREATED_MULT
 
-# Assisted demerit
+# Assisted demerit (catch-and-shoot, underperforming the look)
 if assisted and xeFG% < 0.45:
-    shot_score *= 0.90    # slight demerit for underperforming easy look
+    shot_score *= 0.90   # ASSISTED_DEMERIT
 ```
 
 ### Rules
-- Bad shot (xeFG% < 0.38) + **made** → no penalty, you scored
-- Open shot + **missed** → no penalty, correct decision
-- Chuck penalty is exponential and compounds per game
-- No shot clock exception — all shots included
+- Bad shot (xeFG% < 0.38) + **made** → no penalty; you scored
+- Open shot + **missed** → no penalty; correct decision
+- Chuck penalty is cumulative and escalates exponentially within a game
+- No shot-clock exception — all shot attempts included
 
 ### Volume-Quality Bonus
-After computing the per-shot mean:
+
+After computing the per-shot mean, if both conditions are met, a bonus is added:
+
 ```python
-avg_xefg = mean(shot["xefg"] for all shots)
-if n_shots >= 15 and avg_xefg >= 0.52:
+avg_xefg = mean(s["xefg"] for s in all_shots)
+n_shots   = len(all_shots)
+
+# Position-adjusted xeFG threshold
+xefg_threshold = {
+    "center":  0.58,   # SQS_XEFG_THRESHOLD_CENTER
+    "forward": 0.53,   # SQS_XEFG_THRESHOLD_FORWARD
+    "guard":   0.50,   # SQS_XEFG_THRESHOLD_GUARD
+}[position]
+
+if n_shots >= 15 and avg_xefg >= xefg_threshold:
     volume_bonus = (n_shots - 14) * 0.5
     SQS += volume_bonus
 ```
-Rewards players who sustain high shot quality (avg xeFG ≥ 0.52) across high volume (15+ attempts).
+
+Rewards players who sustain high shot quality across high volume. Threshold is position-adjusted: centers must maintain a higher zone quality average than guards to qualify.
 
 ### Final SQS
 ```python
 SQS = raw_mean + volume_bonus   # unclamped; can exceed 100
 ```
+
+Zero shots → `SQS = SQS_ZERO_SHOTS_BASELINE (50)`.
 
 ---
 
@@ -106,7 +119,7 @@ SQS = raw_mean + volume_bonus   # unclamped; can exceed 100
 Did this player earn their free throws, or manufacture them?
 
 ### Philosophy
-Ethical basketball = scoring through skill, not contact. Even legitimate fouls are less ideal than not needing them at all.
+Ethical basketball = scoring through skill, not contact. Even legitimate fouls are less ideal than not needing them. Proximity to the defender and game context determine how much credit each FTA is worth.
 
 ### Foul Legitimacy Score (per foul drawn)
 
@@ -115,31 +128,39 @@ Each foul drawn that results in FTA gets a legitimacy score (0.0–1.0):
 ```python
 legitimacy = 0.0
 
-# Defender proximity (from PlayerDashPtShots season-level bucket distribution)
+# ── Defender proximity (PlayerDashPtShots season-level bucket distribution) ──
 # prox_bonus = very_tight_pct * 0.40 + tight_pct * 0.25
-# Fallback: +0.25 flat if no proximity data available for the player
+# Falls back to +0.25 flat if no proximity data available for this player.
 if not off_ball_foul:
-    legitimacy += prox_bonus   # ranges ~0.08–0.40 depending on player's shot profile
+    legitimacy += prox_bonus
 
-# Other positive signals
+# ── Position modifier ──────────────────────────────────────────────────────
+if position == "center" and location == "paint":
+    legitimacy += 0.10   # FDS_CENTER_PAINT_BONUS — natural contact zone
+if position == "guard" and location == "3pt":
+    legitimacy -= 0.10   # FDS_GUARD_3PT_PENALTY — higher manipulation suspicion
+
+# ── Other positive signals ─────────────────────────────────────────────────
 if assisted (catch-and-shoot): legitimacy += 0.20
-if and_1 (made + fouled):      legitimacy += 0.20
+if and_1 (made shot + foul):   legitimacy += 0.20
 
-# Repetition penalties (same foul subtype within the game)
-if 3rd foul of same type this game:  legitimacy -= 0.20
-if 4th+ foul of same type this game: legitimacy -= 0.30
+# ── Repetition penalty (same foul subtype within this game) ───────────────
+if 3rd foul of same subtype:  legitimacy -= 0.10   # FDS_REP_PENALTY_3RD
+if 4th+ foul of same subtype: legitimacy -= 0.20   # FDS_REP_PENALTY_4TH
 
-# Hard cap for off-ball fouls (personal / loose-ball in bonus)
+# ── Hard caps ─────────────────────────────────────────────────────────────
 if off_ball_foul:
     legitimacy = min(legitimacy, 0.45)
 
-# Garbage time cap (Q4, lead ≥ 20, ≤ 5 min left)
+# Garbage time: Q4, lead ≥ 25 pts, ≤ 5 min left
 if garbage_time:
-    legitimacy = min(legitimacy, 0.20)
+    legitimacy = min(legitimacy, 0.20)   # GARBAGE_TIME_LEG_CAP
 
 # Global clamp
 legitimacy = clamp(legitimacy, 0.0, 1.0)
 ```
+
+> **Rep penalty history:** 3rd-foul penalty was softened from −0.20 → −0.10; 4th+ from −0.30 → −0.20 after 12-game validation showed over-penalisation of players who legitimately drew the same foul type repeatedly.
 
 ### FDS Formula
 
@@ -150,21 +171,21 @@ FDS = avg_legitimacy * 100   # unclamped
 
 # FT% modifier
 if FTM / FTA < 0.60 and FTA >= 4:
-    FDS *= 0.92
+    FDS *= 0.92   # FT_PCT_MODIFIER
 
 # Zero-FTA baseline
 if FTA_in_game == 0:
-    FDS = 50   # neutral; player neither helped nor hurt by foul drawing
+    FDS = 50   # ZERO_FTA_BASELINE — neutral; player neither helped nor hurt
 ```
 
-> **Note (calibration 2025-05):** Volume penalty (`FTA^1.3 × 2.5`) was removed — it zeroed out all high-FTA star players regardless of legitimacy quality. Aggregate clamp also removed; FDS floats freely. Zero-FTA baseline reduced from 72 → 50 to compress the bench-player advantage.
+> **Calibration log:** Volume penalty (`FTA^1.15 × 1.0`) was removed — it zeroed star players regardless of legitimacy quality. Aggregate clamp also removed; FDS floats freely. Zero-FTA baseline reduced from 72 → 50 to compress the bench-player advantage. Position modifiers and softened rep penalties added after 12-game validation.
 
 ---
 
 ## Sub-Score 3: FT Dependency Score (FTP) — 25%
 
 ### Goal
-Reward scoring through field goals and penalize FT dependency, while also recognizing that high-volume FG scorers contribute more than low-volume ones at the same dependency rate.
+Reward scoring through field goals and penalize FT dependency, while recognising that high-volume FG scorers contribute more than low-volume ones at the same dependency rate.
 
 ### Formula
 
@@ -175,8 +196,8 @@ total_points = FT_points + FG_points
 
 ft_dep_ratio = FT_points / total_points   # 0.0 if total_points == 0
 
-ratio_score  = (1 - ft_dep_ratio) * 70   # max 70
-volume_score = min(total_points, 30)      # max 30
+ratio_score  = (1 - ft_dep_ratio) * 70   # max 70  (FTP_RATIO_WEIGHT)
+volume_score = min(total_points, 30)      # max 30  (FTP_VOLUME_CAP)
 
 FTP = ratio_score + volume_score          # naturally in [0, 100], no clamp needed
 ```
@@ -203,44 +224,43 @@ FTP = ratio_score + volume_score          # naturally in [0, 100], no clamp need
 
 ---
 
-## Sub-Score 4: Sportsmanship Score (SPS) — 15%
+## Sub-Score 4: Sportsmanship Score (SPS) — 5%
 
 ### Goal
 Did this player conduct themselves with integrity, or manipulate the game through deception and aggression?
 
 ### Philosophy
-Starts at 100, penalties only. Clean conduct = no deduction. Flagrant fouls committed on defense are handled here (not DES).
+Starts at 100, penalties only. Clean conduct = no deduction. Flagrant fouls are handled here (not DES).
 
 ### Violation Penalties
 
 | Violation | Base Penalty |
 |---|---|
-| Flagrant 2 | -40 |
-| Flagrant 1 | -25 |
-| Technical foul | -18 |
-| Illegal screen (called) | -10 |
-| Delay of game | -8 |
+| Flagrant 2 | −40 |
+| Flagrant 1 | −25 |
+| Technical foul | −18 |
+| Illegal screen (called) | −10 |
+| Delay of game | −8 |
 
-- Technical fouls: **Option A** — all techs treated equally at -18 (V2 upgrade: split by reason)
-- Late game intentional fouls: **not penalized** (legitimate strategy)
-- Flop violations: handled implicitly via FDS low legitimacy scores — no dedicated endpoint available in nba_api
+- Late-game intentional fouls: **not penalized** (legitimate strategy)
+- Flop violations: handled implicitly via FDS low legitimacy scores; no dedicated endpoint available
 
 ### Exponential Stacking (per violation type)
 
 ```python
 for each violation_type:
-    count = occurrences in this game
-    penalty = base_penalty * (count ^ 1.4)
+    count   = occurrences in this game
+    penalty = base_penalty * (count ^ 1.4)   # SPS_STACK_EXP
 
 SPS = max(0, 100 - sum(all penalties))   # floor at 0; only sub-score with any clamp
 ```
 
-### Stacking Reference (Technical Fouls)
+### Stacking Reference (Technical Fouls, base = 18)
 
 | Techs | Penalty |
 |---|---|
-| 1 | 18 pts |
-| 2 | 48 pts |
+| 1 | 18.0 pts |
+| 2 | 48.0 pts |
 
 ---
 
@@ -255,51 +275,58 @@ Did this player compete defensively, or coast and take plays off?
 |---|---|
 | Contested shots defended | × 3.5 |
 | Deflections | × 4.0 |
-| Steals | × 5.0 (linear, no cap) |
+| Steals | × 5.0 |
 | Blocks | × 5.0 |
 | Defensive rebounds | × 2.0 |
-| Charges taken | × 15.0 (flat bonus) |
+| Charges taken (`chargesDrawn`) | × 15.0 |
 
 ### Foul Penalty (Differentiated by Type)
 
 ```python
-adjusted_fouls = (defensive_fouls * 1.0)
-               + (offensive_fouls * 1.3)   # active manipulation, penalized harder
-               + (loose_ball_fouls * 0.5)  # effort play, lightest penalty
+adjusted_fouls = (defensive_fouls  * 1.0)   # DEF_FOUL_MULT
+               + (offensive_fouls  * 1.3)   # OFF_FOUL_MULT — active manipulation
+               + (loose_ball_fouls * 0.5)   # LOOSE_BALL_MULT — effort play, lightest
 
-foul_penalty = (adjusted_fouls ^ 1.3) * 5
+foul_penalty = (adjusted_fouls ^ 1.3) * 5   # FOUL_PENALTY_EXP, FOUL_PENALTY_BASE
 ```
 
-### Foul Penalty Reference (defensive fouls only)
+### DES Formula (Position-Adjusted)
+
+```python
+positive_total = (contested * 3.5) + (deflections * 4.0)
+               + (steals * 5.0)   + (blocks * 5.0)
+               + (drebs * 2.0)    + (charges * 15.0)
+
+# Position-adjusted normalization
+norm = {
+    "center":  110,   # DES_NORM_CENTER
+    "forward":  85,   # DES_NORM_FORWARD
+    "guard":    60,   # DES_NORM_GUARD
+}[position]
+
+DES_raw = (positive_total / norm) * 100   # unclamped
+
+foul_penalty = (adjusted_fouls ^ 1.3) * 5
+
+DES = DES_raw - foul_penalty   # unclamped; can exceed 100 or go negative
+
+# Zero-defense edge case
+if all defensive stats == 0:
+    DES = 25   # ZERO_DEF_BASELINE — coasting, not misconduct
+```
+
+**Why position-adjusted?** Centers are expected to contest more shots and grab more defensive rebounds than guards. Normalizing against a higher baseline (110) means a center must generate more activity to reach DES = 100, while a guard reaching 60 weighted points is already performing at an elite level for their role. Replaces the flat 80-point baseline used through the 12-game validation.
+
+### Foul Penalty Reference (defensive fouls only, no type adjustment)
 
 | Fouls | Penalty |
 |---|---|
-| 1 | 5 pts |
-| 2 | 12 pts |
-| 3 | 21 pts |
-| 4 | 32 pts |
-| 5 | 44 pts |
-| 6 (fouled out) | 57 pts |
-
-### DES Formula
-
-```python
-positive_total = (contested_shots * 3.5) + (deflections * 4.0)
-               + (steals * 5.0) + (blocks * 5.0)
-               + (defensive_rebounds * 2.0) + (charges_taken * 15.0)
-
-DES_raw = (positive_total / 80) * 100   # unclamped; elite game ≈ 100 before penalty
-
-foul_penalty = (adjusted_fouls ^ 1.3) * 5
-
-DES = DES_raw - foul_penalty            # unclamped; can exceed 100 or go negative
-
-# Zero defense edge case
-if all defensive stats == 0:
-    DES = 25    # coasting penalty, not misconduct
-```
-
-**Normalization baseline (80):** A player generating 8 contested shots × 3.5 + 5 deflections × 4.0 + 2 steals × 5.0 + 2 blocks × 5.0 + 6 drebs × 2.0 = 80 weighted points scores `DES_raw = 100`. After 2–3 typical defensive fouls this produces DES ≈ 80–88, the intended elite-game range. Extraordinary performances legitimately exceed 100.
+| 1 | 5.0 pts |
+| 2 | 11.9 pts |
+| 3 | 20.8 pts |
+| 4 | 31.5 pts |
+| 5 | 43.7 pts |
+| 6 (fouled out) | 57.3 pts |
 
 ---
 
@@ -307,90 +334,106 @@ if all defensive stats == 0:
 
 ### Definition
 ```python
-if quarter == 4 and point_differential >= 20 and time_remaining <= 5:
+if quarter == 4 and point_differential >= 25 and time_remaining_seconds <= 300:
     garbage_time = True
 ```
 
-A game is considered decided — any FTA drawn in this window are flagged as potential padding regardless of how legitimate the foul looked.
+A game is considered decided once the lead reaches 25+ points with ≤ 5 minutes left. FTA drawn in this window are flagged as potential stat-padding regardless of how legitimate the foul appeared.
+
+> **Threshold history:** Lead threshold tightened from 20 → 25 pts after 12-game validation flagged too many legitimate 4th-quarter fouls in games that remained competitive.
 
 ### Application in FDS
 ```python
 if garbage_time and foul_drawn:
-    legitimacy = min(legitimacy, 0.20)
-```
-
-### Application in FTP
-```python
-garbage_FTA_ratio = garbage_time_FTA / total_FTA
-
-if garbage_FTA_ratio > 0.30:
-    extra_penalty = (garbage_FTA_ratio * 100) ^ 1.3 * 0.20
-    FTP -= extra_penalty
+    legitimacy = min(legitimacy, 0.20)   # GARBAGE_TIME_LEG_CAP
 ```
 
 ### What This Does NOT Affect
-- Field goal attempts in garbage time are **not penalized** — taking shots even in a blowout is fine
-- Only FTA drawn in garbage time are flagged
-- Early game legitimate play is fully preserved in the score
+- Field goal attempts in garbage time are **not penalized** — shooting in a blowout is fine
+- DES, SPS, and FTP are unaffected by the garbage time flag
+- Early-game legitimate play is fully preserved
 
 ---
-
-
 
 ## Data Sources
 
 | Data | Source | Endpoint |
 |---|---|---|
 | Shot location, zone, made/missed | `nba_api` | `ShotChartDetail` (player_id=0, per team) |
-| Defender proximity (FDS legitimacy) | `nba_api` | `PlayerDashPtShots` result set [4] — `CLOSE_DEF_DIST_RANGE` buckets, season-level |
 | Assisted vs self-created | `nba_api` | `PlayByPlayV3` + assist cross-reference |
-| FTA, FTM, FGM breakdown | `nba_api` | `BoxScoreTraditionalV3` |
+| Defender proximity (FDS legitimacy) | `nba_api` | `PlayerDashPtShots` result set [4] — `CLOSE_DEF_DIST_RANGE` buckets, season-level |
+| FTA, FTM, FGM breakdown, position | `nba_api` | `BoxScoreTraditionalV3` |
 | Foul type classification | `nba_api` | `PlayByPlayV3` (actionType / subType / description) |
 | Technical / flagrant fouls | `nba_api` | `PlayByPlayV3` |
-| Official flop violations | NBA.com | Published foul reports (V2 — not yet integrated) |
-| Contested shots, deflections, charges | `nba_api` | `BoxScoreHustleV2` |
+| Contested shots, deflections, charges | `nba_api` | `BoxScoreHustleV2` (`chargesDrawn` column) |
 | Blocks, steals, rebounds | `nba_api` | `BoxScoreTraditionalV3` |
+| Official flop violations | NBA.com | Published foul reports (V2 — not yet integrated) |
+
+---
+
+## Scripts
+
+| Script | Purpose |
+|---|---|
+| `pipeline.py` | Single-game data pull hardcoded to Bam Adebayo 2026-03-10 — used for development only |
+| `compute_ehi.py` | Sub-score computation for all active players; validation print helpers |
+| `run_validation.py` | Runs 12 hardcoded validation games; writes to `ehi.db` |
+| `run_season.py` | Full 2025-26 regular season run; resume-safe; retry/backoff; auto-calls `get_season_summary` on completion |
+| `query_ehi.py` | DB query utilities: `get_player_game`, `get_player_season`, `get_game_leaderboard`, `get_season_best`, `get_season_worst`, `get_season_summary`; all callable from CLI |
+| `database.py` | SQLite persistence layer (`games`, `player_games`, `shots`, `validation_notes` tables) |
+| `config.py` | All tunable constants |
+
+**`query_ehi.py` CLI examples:**
+```bash
+python3 query_ehi.py player       'Luka Doncic'  2025-26
+python3 query_ehi.py player-game  'Luka Doncic'  2026-01-26
+python3 query_ehi.py game          2026-01-26    DAL  ATL
+python3 query_ehi.py season-best   2025-26       20
+python3 query_ehi.py season-worst  2025-26
+python3 query_ehi.py summary       2025-26
+```
 
 ---
 
 ## Validation Status
 
-Validation complete across **12 games** (218 qualifying player-game rows, min ≥ 8 min, stored in `ehi.db`). Star player results with current formula:
+Validated across **12 games** (218+ qualifying player-game rows, min ≥ 8 min, stored in `ehi.db`).
+
+**Current validation stats (n=17 star player-game rows, pts ≥ 20):**
+EHI range: **47.62–69.45** · mean: **57.24** · std dev: **4.95**
+
+Representative star-player results (earlier calibration — run `python3 compute_ehi.py` for current values):
 
 | Player | Game | MIN | Pts | SQS | FDS | FTP | DES | EHI |
 |---|---|---|---|---|---|---|---|---|
-| Jalen Brunson | MIL vs NYK 12/23/2023 | 37.3 | 36 | 62.8 | 34.1 | 94.2 | 83.3 | **67.77** |
-| James Harden | HOU vs NYK 01/23/2019 | 40.0 | 61 | 73.4 | 6.8 | 74.8 | 90.4 | 62.60 |
-| Giannis Antetokounmpo | MIL vs NYK 12/23/2023 | 32.4 | 28 | 64.7 | 21.4 | 83.0 | 41.7 | 61.24 |
-| Victor Wembanyama | SAS vs DAL 10/22/2025 | 29.7 | 40 | 62.9 | 12.6 | 84.2 | 83.4 | 61.05 |
-| Kawhi Leonard | DET vs LAC 12/28/2025 | 38.6 | 55 | 60.0 | 8.7 | 79.6 | 128.9 | 60.06 |
-| Stephen Curry | GSW vs POR 01/03/2021 | 36.4 | 62 | 66.1 | 3.4 | 79.7 | 37.5 | 57.22 |
-| Nikola Jokić | MIN vs DEN 04/01/2025 | 52.6 | 61 | 61.2 | 13.9 | 78.2 | 37.6 | 56.73 |
-| Anthony Edwards | MIN vs DEN 04/01/2025 | 50.5 | 34 | 57.9 | 10.6 | 89.7 | 8.6 | 56.04 |
-| LeBron James | LAL vs CLE 03/31/2026 | 30.6 | 14 | 51.8 | 8.5 | 59.0 | 30.8 | 46.29 |
-| James Harden (LAC) | DET vs LAC 12/28/2025 | 40.0 | 28 | 54.0 | 8.2 | 70.5 | −9.0 | 45.68 |
+| Jalen Brunson | MIL vs NYK 12/23/2023 | 37.3 | 36 | 62.8 | 34.1 | 94.2 | 83.3 | ~68 |
+| Victor Wembanyama | SAS vs DAL 10/22/2025 | 29.7 | 40 | 62.9 | 12.6 | 84.2 | 83.4 | ~61 |
+| Kawhi Leonard | DET vs LAC 12/28/2025 | 38.6 | 55 | 60.0 | 8.7 | 79.6 | 128.9 | ~60 |
+| Stephen Curry | GSW vs POR 01/03/2021 | 36.4 | 62 | 66.1 | 3.4 | 79.7 | 37.5 | ~57 |
+| LeBron James | LAL vs CLE 03/31/2026 | 30.6 | 14 | 51.8 | 8.5 | 59.0 | 30.8 | ~47 |
 
-**Star EHI range: 46.29–67.77 · std dev: 5.37 · mean: 56.18 · n=17 game-rows**
-**Global range (218 rows): 26.33–75.76 · mean: 55.69 · std: 7.81**
+*Exact values shift with each calibration; use `print_validation_table()` or `query_ehi.py` for live DB figures.*
 
-Next step: **`run_season.py`** — full 2025-26 season run across all game IDs.
+**Next step:** `python3 run_season.py` overnight (~9–10 hrs, ~1,230 games). Then `python3 query_ehi.py summary 2025-26` for the first full-season distribution.
 
 ---
 
-## Tunable Constants (centralize these in code)
+## Tunable Constants
+
+All live in `config.py`.
 
 ```python
-# Weights
+# ─── Weights ────────────────────────────────────────────────────────────────
 W_SQS = 0.45
 W_FDS = 0.20
 W_FTP = 0.25
 W_SPS = 0.05
 W_DES = 0.05
 
-# Activity filter
+# ─── Activity filter ────────────────────────────────────────────────────────
 MIN_MINUTES_THRESHOLD = 8   # players below this excluded entirely
 
-# SQS
+# ─── SQS ────────────────────────────────────────────────────────────────────
 CHUCK_THRESHOLD          = 0.38
 SELF_CREATED_MULT        = 1.25
 ASSISTED_DEMERIT         = 0.90
@@ -402,25 +445,35 @@ SQS_ZERO_SHOTS_BASELINE  = 50
 SQS_SC_XEFG_THRESHOLD    = 0.50
 SQS_AST_XEFG_THRESHOLD   = 0.45
 
-# FDS
-VOLUME_PENALTY_BASE = 1.0   # DEPRECATED
-VOLUME_PENALTY_EXP  = 1.15  # DEPRECATED
-FT_PCT_THRESHOLD    = 0.60
-FT_PCT_MODIFIER     = 0.92
-ZERO_FTA_BASELINE   = 50
+# Position-adjusted volume-quality xeFG thresholds
+SQS_XEFG_THRESHOLD_CENTER  = 0.58
+SQS_XEFG_THRESHOLD_FORWARD = 0.53
+SQS_XEFG_THRESHOLD_GUARD   = 0.50
 
-# FTP
-FTP_RATIO_WEIGHT              = 70   # (1 - dep_ratio) * 70
-FTP_VOLUME_CAP                = 30   # min(total_pts, 30)
-FT_DEP_THRESHOLD              = 0.50   # DEPRECATED
-FT_DEP_PENALTY_MULT           = 0.15   # DEPRECATED
-FT_DEP_PENALTY_EXP            = 1.3    # DEPRECATED
-ZERO_POINTS_BASELINE          = 50     # DEPRECATED
-FTP_SCORING_BONUS_PTS_THRESHOLD = 30   # DEPRECATED
-FTP_SCORING_BONUS_DEP_CAP       = 0.35 # DEPRECATED
-FTP_SCORING_BONUS_MULT          = 0.3  # DEPRECATED
+# xeFG% hardcoded fallbacks (overridden by empirical data where ≥50 shots in DB)
+XEFG_AT_RIM         = 0.72
+XEFG_PAINT_NON_RIM  = 0.54
+XEFG_MID_RANGE      = 0.44
+XEFG_CORNER_3       = 0.58
+XEFG_ABOVE_BREAK_3  = 0.52
+XEFG_BACKCOURT      = 0.30
 
-# SPS
+# ─── FDS ────────────────────────────────────────────────────────────────────
+FT_PCT_THRESHOLD       = 0.60
+FT_PCT_MODIFIER        = 0.92
+ZERO_FTA_BASELINE      = 50
+FDS_REP_PENALTY_3RD    = 0.10   # 3rd foul of same subtype  (was 0.20)
+FDS_REP_PENALTY_4TH    = 0.20   # 4th+ foul of same subtype (was 0.30)
+FDS_CENTER_PAINT_BONUS = 0.10
+FDS_GUARD_3PT_PENALTY  = 0.10
+VOLUME_PENALTY_BASE    = 1.0    # DEPRECATED — not applied
+VOLUME_PENALTY_EXP     = 1.15   # DEPRECATED — not applied
+
+# ─── FTP ────────────────────────────────────────────────────────────────────
+FTP_RATIO_WEIGHT = 70   # (1 - dep_ratio) * 70
+FTP_VOLUME_CAP   = 30   # min(total_pts, 30)
+
+# ─── SPS ────────────────────────────────────────────────────────────────────
 TECH_PENALTY        = 18
 FLAGRANT1_PENALTY   = 25
 FLAGRANT2_PENALTY   = 40
@@ -428,23 +481,26 @@ ILLEGAL_SCREEN_PEN  = 10
 DELAY_PENALTY       = 8
 SPS_STACK_EXP       = 1.4
 
-# DES
-CONTESTED_WEIGHT    = 3.5
-DEFLECTION_WEIGHT   = 4.0
-STEAL_WEIGHT        = 5.0
-BLOCK_WEIGHT        = 5.0
-DREB_WEIGHT         = 2.0
-CHARGE_WEIGHT       = 15.0
-DES_NORMALIZATION   = 80    # elite 36-min game ≈ 80 weighted pts → DES_raw=100
-FOUL_PENALTY_BASE   = 5
-FOUL_PENALTY_EXP    = 1.3
-DEF_FOUL_MULT       = 1.0
-OFF_FOUL_MULT       = 1.3
-LOOSE_BALL_MULT     = 0.5
-ZERO_DEF_BASELINE   = 25
+# ─── DES ────────────────────────────────────────────────────────────────────
+CONTESTED_WEIGHT  = 3.5
+DEFLECTION_WEIGHT = 4.0
+STEAL_WEIGHT      = 5.0
+BLOCK_WEIGHT      = 5.0
+DREB_WEIGHT       = 2.0
+CHARGE_WEIGHT     = 15.0
+DES_NORM_CENTER   = 110   # position-adjusted normalization baselines
+DES_NORM_FORWARD  = 85
+DES_NORM_GUARD    = 60
+DES_NORMALIZATION = 80    # DEPRECATED — flat baseline replaced by per-position norms
+FOUL_PENALTY_BASE = 5
+FOUL_PENALTY_EXP  = 1.3
+DEF_FOUL_MULT     = 1.0
+OFF_FOUL_MULT     = 1.3
+LOOSE_BALL_MULT   = 0.5
+ZERO_DEF_BASELINE = 25
 
-# Garbage Time
-GARBAGE_TIME_LEAD         = 20
+# ─── Garbage Time ───────────────────────────────────────────────────────────
+GARBAGE_TIME_LEAD         = 25   # point differential threshold (was 20)
 GARBAGE_TIME_MINUTES_LEFT = 5
 GARBAGE_TIME_LEG_CAP      = 0.20
 GARBAGE_FTA_THRESHOLD     = 0.30
@@ -454,4 +510,18 @@ GARBAGE_FTP_PENALTY_EXP   = 1.3
 
 ---
 
-*EHI v1.1 — unclamped sub-scores, ratio+volume FTP, SQS volume-quality bonus, 12-game validation complete*
+## Known Limitations
+
+| Limitation | Impact | Future fix |
+|---|---|---|
+| xeFG% empirical sample small (2,216 shots) | Corner 3 and rim values unreliable until season run | Stabilises after run_season.py |
+| Position detection uses roster label, not role | Stretch bigs and combo guards normalise against wrong baseline | Manual override map |
+| No per-shot defender distance | SQS cannot distinguish open vs contested at shot level | `ShotQualityDetail` endpoint (if available) |
+| FDS proximity is season-level, not game-level | `PlayerDashPtShots` returns 0 rows per game; season average used as proxy | None available |
+| No opponent adjustment | DES/SQS not adjusted for opponent quality | Separate opponent-strength factor |
+| No clutch-moment bonus | Big shot in close game counts same as garbage-time make | Clutch multiplier (future) |
+| Illegal screen / delay-of-game SPS matchers untested | Validation games contained no such violations | Test against a game with a known illegal screen |
+
+---
+
+*EHI v1.2 — position-adjusted DES/SQS/FDS, empirical xeFG table, softened FDS rep penalties, garbage time 25pt, run_season.py + query_ehi.py complete, 12-game validation EHI range 47.62–69.45*
