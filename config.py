@@ -21,11 +21,14 @@ HEADERS = {
 }
 
 # ─── EHI WEIGHTS ────────────────────────────────────────────────────────────
-W_SQS = 0.35
+W_SQS = 0.45
 W_FDS = 0.20
-W_FTP = 0.20
-W_SPS = 0.15
-W_DES = 0.10
+W_FTP = 0.25
+W_SPS = 0.05
+W_DES = 0.05
+
+# ─── ACTIVITY FILTER ────────────────────────────────────────────────────────
+MIN_MINUTES_THRESHOLD = 8   # players below this are excluded from EHI entirely
 
 # ─── SQS CONSTANTS ──────────────────────────────────────────────────────────
 CHUCK_THRESHOLD     = 0.38
@@ -53,17 +56,26 @@ SQS_SC_XEFG_THRESHOLD    = 0.50   # min xeFG% for self-created bonus
 SQS_AST_XEFG_THRESHOLD   = 0.45   # max xeFG% for assisted demerit
 
 # ─── FDS CONSTANTS ──────────────────────────────────────────────────────────
-VOLUME_PENALTY_BASE = 1.0    # DEPRECATED — removed after 12-game calibration; not applied in compute_fds
-VOLUME_PENALTY_EXP  = 1.15  # DEPRECATED — removed after 12-game calibration; not applied in compute_fds
+VOLUME_PENALTY_BASE = 1.0    # DEPRECATED — not applied in compute_fds
+VOLUME_PENALTY_EXP  = 1.15  # DEPRECATED — not applied in compute_fds
 FT_PCT_THRESHOLD    = 0.60
 FT_PCT_MODIFIER     = 0.92
-ZERO_FTA_BASELINE   = 72
+ZERO_FTA_BASELINE   = 50
 
 # ─── FTP CONSTANTS ──────────────────────────────────────────────────────────
-FT_DEP_THRESHOLD     = 0.50
-FT_DEP_PENALTY_MULT  = 0.15
-FT_DEP_PENALTY_EXP   = 1.3
-ZERO_POINTS_BASELINE = 75
+# Ratio component: (1 - FT_dep_ratio) × FTP_RATIO_WEIGHT  → max 70
+FTP_RATIO_WEIGHT = 70
+# Volume component: min(total_pts × 1.0, FTP_VOLUME_CAP)  → max 30
+FTP_VOLUME_CAP   = 30
+# Combined FTP = ratio_score + volume_score  → naturally in [0, 100]
+# Zero scorers: ratio=70, volume=0 → FTP=70 (neutral, no special case needed)
+FT_DEP_THRESHOLD              = 0.50   # DEPRECATED
+FT_DEP_PENALTY_MULT           = 0.15   # DEPRECATED
+FT_DEP_PENALTY_EXP            = 1.3    # DEPRECATED
+ZERO_POINTS_BASELINE          = 50     # DEPRECATED — formula handles zero scorers naturally
+FTP_SCORING_BONUS_PTS_THRESHOLD = 30   # DEPRECATED — volume now baked into base formula
+FTP_SCORING_BONUS_DEP_CAP       = 0.35 # DEPRECATED
+FTP_SCORING_BONUS_MULT          = 0.3  # DEPRECATED
 
 # ─── SPS CONSTANTS ──────────────────────────────────────────────────────────
 TECH_PENALTY       = 18
@@ -80,7 +92,7 @@ STEAL_WEIGHT      = 5.0
 BLOCK_WEIGHT      = 5.0
 DREB_WEIGHT       = 2.0
 CHARGE_WEIGHT     = 15.0
-DES_NORMALIZATION = 30
+DES_NORMALIZATION = 80
 FOUL_PENALTY_BASE = 5
 FOUL_PENALTY_EXP  = 1.3
 DEF_FOUL_MULT     = 1.0

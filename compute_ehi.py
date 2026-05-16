@@ -16,11 +16,10 @@ import pandas as pd
 from config import (
     # Weights
     W_SQS, W_FDS, W_FTP, W_SPS, W_DES,
+    MIN_MINUTES_THRESHOLD,
     # FTP constants
-    FT_DEP_THRESHOLD,
-    FT_DEP_PENALTY_MULT,
-    FT_DEP_PENALTY_EXP,
-    ZERO_POINTS_BASELINE,
+    FTP_RATIO_WEIGHT,
+    FTP_VOLUME_CAP,
     # SPS constants
     TECH_PENALTY,
     FLAGRANT1_PENALTY,
@@ -102,62 +101,36 @@ def compute_ftp(row: pd.Series) -> dict:
     """
     FT Dependency Score for one player (EHI ref §3).
 
-    Returns a dict with all intermediate values so the caller can
-    print a full validation table without re-computing anything.
-    """
-    ftm     = int(row["freeThrowsMade"])
-    fgm_2   = int(row["twoPointersMade"])
-    fgm_3   = int(row["threePointersMade"])
-    fgm_tot = int(row["fieldGoalsMade"])   # used only for the pure-FT edge case
+    FTP = ratio_score + volume_score  (naturally in [0, 100])
+      ratio_score  = (1 − FT_dep_ratio) × FTP_RATIO_WEIGHT   (max 70)
+      volume_score = min(total_pts, FTP_VOLUME_CAP)           (max 30)
 
-    ft_pts    = ftm                         # each FT = 1 point
+    Zero scorers: ft_dep_ratio=0 → ratio=70, volume=0 → FTP=70 (neutral).
+    Pure FT scorers: ft_dep_ratio=1 → ratio=0, volume=min(ftm, 30).
+    """
+    ftm   = int(row["freeThrowsMade"])
+    fgm_2 = int(row["twoPointersMade"])
+    fgm_3 = int(row["threePointersMade"])
+
+    ft_pts    = ftm
     fg_pts    = fgm_2 * 2 + fgm_3 * 3
     total_pts = ft_pts + fg_pts
 
-    # ── Edge case A: player scored zero points ────────────────────────────────
-    if total_pts == 0:
-        return dict(
-            ft_pts=0, fg_pts=0, total_pts=0,
-            ft_dep_ratio=0.0,
-            ftp_raw=float(ZERO_POINTS_BASELINE),
-            extra_penalty=0.0,
-            FTP=float(ZERO_POINTS_BASELINE),
-            note="zero pts → baseline",
-        )
+    ft_dep_ratio = ft_pts / total_pts if total_pts > 0 else 0.0
 
-    # ── Edge case B: scored only via FTs, never made a field goal ─────────────
-    if fgm_tot == 0 and ftm > 0:
-        return dict(
-            ft_pts=ft_pts, fg_pts=0, total_pts=total_pts,
-            ft_dep_ratio=1.0,
-            ftp_raw=0.0,
-            extra_penalty=0.0,
-            FTP=0.0,
-            note="pure FT scorer → 0",
-        )
-
-    # ── Normal path ───────────────────────────────────────────────────────────
-    ft_dep_ratio = ft_pts / total_pts
-    ftp_raw      = (1.0 - ft_dep_ratio) * 100.0
-
-    extra_penalty = 0.0
-    note          = ""
-    if ft_dep_ratio > FT_DEP_THRESHOLD:
-        excess        = ft_dep_ratio - FT_DEP_THRESHOLD
-        extra_penalty = (excess * 100) ** FT_DEP_PENALTY_EXP * FT_DEP_PENALTY_MULT
-        note          = f"dep {ft_dep_ratio*100:.1f}% > {FT_DEP_THRESHOLD*100:.0f}% → −{extra_penalty:.2f}"
-
-    ftp = clamp(ftp_raw - extra_penalty)
+    ratio_score  = (1.0 - ft_dep_ratio) * FTP_RATIO_WEIGHT
+    volume_score = min(float(total_pts), float(FTP_VOLUME_CAP))
+    ftp          = ratio_score + volume_score
 
     return dict(
         ft_pts=ft_pts,
         fg_pts=fg_pts,
         total_pts=total_pts,
         ft_dep_ratio=round(ft_dep_ratio, 4),
-        ftp_raw=round(ftp_raw, 2),
-        extra_penalty=round(extra_penalty, 2),
+        ratio_score=round(ratio_score, 2),
+        volume_score=round(volume_score, 2),
         FTP=round(ftp, 2),
-        note=note,
+        note="",
     )
 
 
@@ -266,7 +239,7 @@ def compute_sps(row: pd.Series, violation_index: dict) -> dict:
         per_type[vtype] = {"count": n, "penalty": round(penalty, 2)}
         total_penalty   += penalty
 
-    sps = clamp(100.0 - total_penalty)
+    sps = max(0.0, 100.0 - total_penalty)
 
     return dict(
         counts=per_type,           # {vtype: {"count": n, "penalty": p}}
@@ -393,7 +366,7 @@ def compute_des(row: pd.Series, hustle: pd.DataFrame, foul_type_index: dict) -> 
         + drebs       * DREB_WEIGHT
         + charges     * CHARGE_WEIGHT
     )
-    des_raw = clamp((positive_total / DES_NORMALIZATION) * 100.0)
+    des_raw = (positive_total / DES_NORMALIZATION) * 100.0
 
     # ── Foul penalty ──────────────────────────────────────────────────────────
     fouls         = foul_type_index.get(pid, {})
@@ -408,7 +381,7 @@ def compute_des(row: pd.Series, hustle: pd.DataFrame, foul_type_index: dict) -> 
     )
     foul_penalty = (adjusted_fouls ** FOUL_PENALTY_EXP) * FOUL_PENALTY_BASE if adjusted_fouls > 0 else 0.0
 
-    des = clamp(des_raw - foul_penalty)
+    des = des_raw - foul_penalty
 
     return dict(
         contested=contested,
@@ -828,7 +801,7 @@ def compute_fds(row: pd.Series, foul_drawn_index: dict, proximity_index: dict | 
     avg_leg  = (sum(all_legs) / len(all_legs)) if all_legs else 0.0
 
     fds_raw = avg_leg * 100.0
-    fds     = clamp(fds_raw)
+    fds     = fds_raw
 
     # FT% modifier
     ft_pct = ftm / fta
@@ -845,7 +818,7 @@ def compute_fds(row: pd.Series, foul_drawn_index: dict, proximity_index: dict | 
         volume_penalty=0.0,
         ft_pct=round(ft_pct, 4),
         ft_mod=ft_mod,
-        FDS=round(clamp(fds), 2),
+        FDS=round(fds, 2),
         note="",
     )
 
@@ -1014,16 +987,25 @@ def compute_sqs(row: pd.Series, sqs_data: dict) -> dict:
             "shot_score": round(shot_score, 2),
         })
 
-    raw_mean = sum(d["shot_score"] for d in shot_details) / len(shot_details)
-    sqs      = clamp(raw_mean)
+    raw_mean  = sum(d["shot_score"] for d in shot_details) / len(shot_details)
+    n_shots   = len(shots)
+    avg_xefg  = sum(s["xefg"] for s in shots) / n_shots
+
+    volume_bonus = 0.0
+    if n_shots >= 15 and avg_xefg >= 0.52:
+        volume_bonus = (n_shots - 14) * 0.5
+
+    sqs = raw_mean + volume_bonus
 
     return dict(
         shot_details=shot_details,
-        n_shots=len(shots),
+        n_shots=n_shots,
         n_chucks=chuck_count,
         raw_mean=round(raw_mean, 2),
+        avg_xefg=round(avg_xefg, 4),
+        volume_bonus=round(volume_bonus, 2),
         SQS=round(sqs, 2),
-        note="",
+        note=(f"vol_bonus+{volume_bonus:.1f}(n={n_shots},xeFG={avg_xefg:.3f})" if volume_bonus > 0 else ""),
     )
 
 
@@ -1046,7 +1028,7 @@ def compute_all(data: dict) -> tuple[pd.DataFrame, dict]:
     hustle = data["hustle"]
 
     box["minutes_dec"] = box["minutes"].apply(parse_minutes)
-    active = box[box["minutes_dec"] > 0].copy().reset_index(drop=True)
+    active = box[box["minutes_dec"] >= MIN_MINUTES_THRESHOLD].copy().reset_index(drop=True)
 
     # Build all game-wide indices once — O(n_plays / n_shots), not per-player
     violation_index  = build_violation_index(pbp)
@@ -1095,14 +1077,14 @@ def compute_all(data: dict) -> tuple[pd.DataFrame, dict]:
             "2pm":      int(row["twoPointersMade"]),
             "3pm":      int(row["threePointersMade"]),
             # ── FTP intermediates ─────────────────────────────────────────
-            "ft_pts":       ftp["ft_pts"],
-            "fg_pts":       ftp["fg_pts"],
-            "total_pts":    ftp["total_pts"],
-            "ft_dep%":      round(ftp["ft_dep_ratio"] * 100, 1),
-            "ftp_raw":      ftp["ftp_raw"],
-            "ftp_pen":      ftp["extra_penalty"],
-            "FTP":          ftp["FTP"],
-            "ftp_note":     ftp["note"],
+            "ft_pts":        ftp["ft_pts"],
+            "fg_pts":        ftp["fg_pts"],
+            "total_pts":     ftp["total_pts"],
+            "ft_dep%":       round(ftp["ft_dep_ratio"] * 100, 1),
+            "ftp_ratio":     ftp["ratio_score"],
+            "ftp_volume":    ftp["volume_score"],
+            "FTP":           ftp["FTP"],
+            "ftp_note":      ftp["note"],
             # ── SPS intermediates ─────────────────────────────────────────
             "sps_tech":     sps["counts"]["technical"]["count"],
             "sps_flag1":    sps["counts"]["flagrant1"]["count"],
@@ -1137,11 +1119,13 @@ def compute_all(data: dict) -> tuple[pd.DataFrame, dict]:
             "FDS":          fds["FDS"],
             "fds_note":     fds["note"],
             # ── SQS ───────────────────────────────────────────────────────
-            "sqs_shots":    sqs["n_shots"],
-            "sqs_chucks":   sqs["n_chucks"],
-            "sqs_raw":      sqs["raw_mean"],
-            "SQS":          sqs["SQS"],
-            "sqs_note":     sqs["note"],
+            "sqs_shots":     sqs["n_shots"],
+            "sqs_chucks":    sqs["n_chucks"],
+            "sqs_raw":       sqs["raw_mean"],
+            "sqs_avg_xefg":  sqs.get("avg_xefg", 0.0),
+            "sqs_vol_bonus": sqs.get("volume_bonus", 0.0),
+            "SQS":           sqs["SQS"],
+            "sqs_note":      sqs["note"],
             # ── EHI ───────────────────────────────────────────────────────
             "EHI": ehi,
         })
@@ -1173,7 +1157,7 @@ def print_ftp_report(df: pd.DataFrame) -> None:
         f"{'FTM':>5}{'FTA':>5}{'FGM':>5}{'2PM':>5}{'3PM':>5}"
         f"  │"
         f"{'ft_pts':>7}{'fg_pts':>7}{'tot':>5}"
-        f"{'FT_dep%':>9}{'raw':>7}{'pen':>7}{'FTP':>7}"
+        f"{'FT_dep%':>9}{'ratio':>7}{'vol':>6}{'FTP':>7}"
         f"  Note"
     )
     print("─" * W)
@@ -1184,7 +1168,7 @@ def print_ftp_report(df: pd.DataFrame) -> None:
             f"{r['ftm']:>5}{r['fta']:>5}{r['fgm']:>5}{r['2pm']:>5}{r['3pm']:>5}"
             f"  │"
             f"{r['ft_pts']:>7}{r['fg_pts']:>7}{r['total_pts']:>5}"
-            f"{r['ft_dep%']:>8.1f}%{r['ftp_raw']:>7.1f}{r['ftp_pen']:>7.2f}{r['FTP']:>7.1f}"
+            f"{r['ft_dep%']:>8.1f}%{r['ftp_ratio']:>7.1f}{r['ftp_volume']:>6.0f}{r['FTP']:>7.1f}"
             f"  {r['ftp_note']}"
         )
 

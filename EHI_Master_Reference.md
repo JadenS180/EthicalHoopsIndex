@@ -2,25 +2,25 @@
 
 ## Overview
 
-The **Ethical Hoops Index (EHI)** is a composite, absolute (0–100) per-game metric that measures how "ethically" an NBA player performed. It rewards skill-based scoring, disciplined defense, and clean conduct, while penalizing manipulation, deception, and laziness.
+The **Ethical Hoops Index (EHI)** is a composite per-game metric that measures how "ethically" an NBA player performed. It rewards skill-based scoring, disciplined defense, and clean conduct, while penalizing manipulation, deception, and laziness.
+
+Sub-scores are **unclamped** — they can exceed 100 for exceptional performances. The sole exception is SPS which has a floor of 0. FTP is naturally bounded [0, 100] by formula construction. EHI inherits the same range and floats freely with the weighted sum. All players with fewer than 8 minutes are excluded from computation entirely.
 
 ---
 
 ## Master Formula
 
 ```
-EHI = 0.35(SQS) + 0.20(FDS) + 0.20(FTP) + 0.15(SPS) + 0.10(DES)
+EHI = 0.45(SQS) + 0.20(FDS) + 0.25(FTP) + 0.05(SPS) + 0.05(DES)
 ```
 
 | Sub-Score | Name | Weight |
 |---|---|---|
-| SQS | Shot Quality Score | 35% |
+| SQS | Shot Quality Score | 45% |
 | FDS | Foul Drawing Score | 20% |
-| FTP | FT Dependency Score | 20% |
-| SPS | Sportsmanship Score | 15% |
-| DES | Defensive Effort Score | 10% |
-
-All sub-scores are on an absolute 0–100 scale. EHI is also 0–100.
+| FTP | FT Dependency Score | 25% |
+| SPS | Sportsmanship Score | 5% |
+| DES | Defensive Effort Score | 5% |
 
 ---
 
@@ -83,9 +83,19 @@ if assisted and xeFG% < 0.45:
 - Chuck penalty is exponential and compounds per game
 - No shot clock exception — all shots included
 
+### Volume-Quality Bonus
+After computing the per-shot mean:
+```python
+avg_xefg = mean(shot["xefg"] for all shots)
+if n_shots >= 15 and avg_xefg >= 0.52:
+    volume_bonus = (n_shots - 14) * 0.5
+    SQS += volume_bonus
+```
+Rewards players who sustain high shot quality (avg xeFG ≥ 0.52) across high volume (15+ attempts).
+
 ### Final SQS
 ```python
-SQS = clamp(mean(all shot_scores), 0, 100)
+SQS = raw_mean + volume_bonus   # unclamped; can exceed 100
 ```
 
 ---
@@ -135,65 +145,61 @@ legitimacy = clamp(legitimacy, 0.0, 1.0)
 
 ```python
 avg_legitimacy = mean(all foul legitimacy scores)
-FTA_in_game = total free throw attempts
 
-FDS_raw = avg_legitimacy * 100
-FDS = clamp(FDS_raw, 0, 100)
+FDS = avg_legitimacy * 100   # unclamped
 
 # FT% modifier
 if FTM / FTA < 0.60 and FTA >= 4:
     FDS *= 0.92
 
-# Zero foul baseline
+# Zero-FTA baseline
 if FTA_in_game == 0:
-    FDS = 72
+    FDS = 50   # neutral; player neither helped nor hurt by foul drawing
 ```
 
-> **Note (calibration 2025-05):** Volume penalty (`FTA^1.3 × 2.5`) was removed after 12-game validation showed it zeroed out FDS for all high-FTA star players regardless of legitimacy quality. Legitimacy signals alone now fully determine FDS.
+> **Note (calibration 2025-05):** Volume penalty (`FTA^1.3 × 2.5`) was removed — it zeroed out all high-FTA star players regardless of legitimacy quality. Aggregate clamp also removed; FDS floats freely. Zero-FTA baseline reduced from 72 → 50 to compress the bench-player advantage.
 
 ---
 
-## Sub-Score 3: FT Dependency Score (FTP) — 20%
+## Sub-Score 3: FT Dependency Score (FTP) — 25%
 
 ### Goal
-What percentage of this player's points came from free throws vs. actual field goals?
+Reward scoring through field goals and penalize FT dependency, while also recognizing that high-volume FG scorers contribute more than low-volume ones at the same dependency rate.
 
 ### Formula
 
 ```python
-FT_points  = FTM * 1
-FG_points  = (FGM_2pt * 2) + (FGM_3pt * 3)
+FT_points    = FTM
+FG_points    = (FGM_2pt * 2) + (FGM_3pt * 3)
 total_points = FT_points + FG_points
 
-FT_dependency_ratio = FT_points / total_points
+ft_dep_ratio = FT_points / total_points   # 0.0 if total_points == 0
 
-FTP_raw = (1 - FT_dependency_ratio) * 100
+ratio_score  = (1 - ft_dep_ratio) * 70   # max 70
+volume_score = min(total_points, 30)      # max 30
 
-# Exponential kick above 50% dependency
-if FT_dependency_ratio > 0.50:
-    excess = FT_dependency_ratio - 0.50
-    extra_penalty = (excess * 100) ^ 1.3 * 0.15
-    FTP = clamp(FTP_raw - extra_penalty, 0, 100)
-else:
-    FTP = FTP_raw
-
-# Edge cases
-if total_points == 0:
-    FTP = 75    # didn't score, but didn't abuse FTs either
-
-if FGM == 0 and FTM > 0:
-    FTP = 0     # pure FT scorer, harshest penalty
+FTP = ratio_score + volume_score          # naturally in [0, 100], no clamp needed
 ```
+
+### Key Properties
+- **Zero scorers:** `dep_ratio = 0 → ratio = 70, volume = 0 → FTP = 70` (neutral)
+- **Max score (100):** requires 0% FT dependency AND ≥ 30 field-goal points
+- **Pure FT scorers:** `dep_ratio = 1.0 → ratio = 0, volume = min(ftm, 30)`
+- No exponential penalty, no edge-case overrides
 
 ### Reference Table
 
-| Points | FTM | FT Dependency | FTP_raw |
-|---|---|---|---|
-| 20 (0 FTM) | 0 | 0% | 100 |
-| 20 (4 FTM) | 4 | 20% | 80 |
-| 20 (8 FTM) | 8 | 40% | 60 |
-| 20 (14 FTM) | 14 | 70% | 30 |
-| 20 (20 FTM) | 20 | 100% | 0 |
+| Pts | FTM | FT dep% | ratio | vol | FTP |
+|---|---|---|---|---|---|
+| 0 | 0 | 0% | 70.0 | 0 | 70.0 |
+| 14 | 0 | 0% | 70.0 | 14 | 84.0 |
+| 30 | 0 | 0% | 70.0 | 30 | 100.0 |
+| 20 | 4 | 20% | 56.0 | 20 | 76.0 |
+| 30 | 8 | 27% | 51.3 | 30 | 81.3 |
+| 55 | 12 | 22% | 54.7 | 30 | 84.7 |
+| 61 | 22 | 36% | 44.8 | 30 | 74.8 |
+| 10 | 6 | 60% | 28.0 | 10 | 38.0 |
+| 10 | 10 | 100% | 0.0 | 10 | 10.0 |
 
 ---
 
@@ -226,8 +232,7 @@ for each violation_type:
     count = occurrences in this game
     penalty = base_penalty * (count ^ 1.4)
 
-SPS = 100 - sum(all penalties)
-SPS = clamp(SPS, 0, 100)
+SPS = max(0, 100 - sum(all penalties))   # floor at 0; only sub-score with any clamp
 ```
 
 ### Stacking Reference (Technical Fouls)
@@ -239,7 +244,7 @@ SPS = clamp(SPS, 0, 100)
 
 ---
 
-## Sub-Score 5: Defensive Effort Score (DES) — 10%
+## Sub-Score 5: Defensive Effort Score (DES) — 5%
 
 ### Goal
 Did this player compete defensively, or coast and take plays off?
@@ -283,16 +288,18 @@ positive_total = (contested_shots * 3.5) + (deflections * 4.0)
                + (steals * 5.0) + (blocks * 5.0)
                + (defensive_rebounds * 2.0) + (charges_taken * 15.0)
 
-DES_raw = clamp((positive_total / 30) * 100, 0, 100)
+DES_raw = (positive_total / 80) * 100   # unclamped; elite game ≈ 100 before penalty
 
 foul_penalty = (adjusted_fouls ^ 1.3) * 5
 
-DES = clamp(DES_raw - foul_penalty, 0, 100)
+DES = DES_raw - foul_penalty            # unclamped; can exceed 100 or go negative
 
 # Zero defense edge case
 if all defensive stats == 0:
     DES = 25    # coasting penalty, not misconduct
 ```
+
+**Normalization baseline (80):** A player generating 8 contested shots × 3.5 + 5 deflections × 4.0 + 2 steals × 5.0 + 2 blocks × 5.0 + 6 drebs × 2.0 = 80 weighted points scores `DES_raw = 100`. After 2–3 typical defensive fouls this produces DES ≈ 80–88, the intended elite-game range. Extraordinary performances legitimately exceed 100.
 
 ---
 
@@ -348,26 +355,25 @@ if garbage_FTA_ratio > 0.30:
 
 ## Validation Status
 
-Initial validation complete across **12 games** (stored in `ehi.db`). Star player results (sorted by EHI):
+Validation complete across **12 games** (218 qualifying player-game rows, min ≥ 8 min, stored in `ehi.db`). Star player results with current formula:
 
-| Player | Game | Pts | FDS | EHI |
-|---|---|---|---|---|
-| Giannis Antetokounmpo | MIL vs NYK 12/23/2023 | 28 | 21.4 | 63.8 |
-| Luka Dončić | DAL vs ATL 01/26/2024 | 73 | 3.1 | 63.3 |
-| Victor Wembanyama | SAS vs DAL 10/22/2025 | 40 | 12.6 | 60.8 |
-| Stephen Curry | GSW vs POR 01/03/2021 | 62 | 3.4 | 60.0 |
-| Tyrese Maxey | MIL vs PHI 11/20/2025 | 54 | 7.4 | 59.8 |
-| Donovan Mitchell | LAL vs CLE 03/31/2026 | 10 | 31.8 | 58.6 |
-| Kawhi Leonard | DET vs LAC 12/28/2025 | 55 | 8.7 | 58.6 |
-| James Harden | HOU vs NYK 01/23/2019 | 61 | 6.8 | 58.0 |
-| Alperen Sengun | HOU vs OKC 10/21/2025 | 39 | 9.8 | 56.3 |
-| Nikola Jokić | MIN vs DEN 04/01/2025 | 61 | 13.9 | 56.3 |
-| Cade Cunningham | DET vs WAS 11/10/2025 | 46 | 6.9 | 54.8 |
-| Shai Gilgeous-Alexander | IND vs OKC 10/23/2025 | 55 | 3.8 | 53.7 |
+| Player | Game | MIN | Pts | SQS | FDS | FTP | DES | EHI |
+|---|---|---|---|---|---|---|---|---|
+| Jalen Brunson | MIL vs NYK 12/23/2023 | 37.3 | 36 | 62.8 | 34.1 | 94.2 | 83.3 | **67.77** |
+| James Harden | HOU vs NYK 01/23/2019 | 40.0 | 61 | 73.4 | 6.8 | 74.8 | 90.4 | 62.60 |
+| Giannis Antetokounmpo | MIL vs NYK 12/23/2023 | 32.4 | 28 | 64.7 | 21.4 | 83.0 | 41.7 | 61.24 |
+| Victor Wembanyama | SAS vs DAL 10/22/2025 | 29.7 | 40 | 62.9 | 12.6 | 84.2 | 83.4 | 61.05 |
+| Kawhi Leonard | DET vs LAC 12/28/2025 | 38.6 | 55 | 60.0 | 8.7 | 79.6 | 128.9 | 60.06 |
+| Stephen Curry | GSW vs POR 01/03/2021 | 36.4 | 62 | 66.1 | 3.4 | 79.7 | 37.5 | 57.22 |
+| Nikola Jokić | MIN vs DEN 04/01/2025 | 52.6 | 61 | 61.2 | 13.9 | 78.2 | 37.6 | 56.73 |
+| Anthony Edwards | MIN vs DEN 04/01/2025 | 50.5 | 34 | 57.9 | 10.6 | 89.7 | 8.6 | 56.04 |
+| LeBron James | LAL vs CLE 03/31/2026 | 30.6 | 14 | 51.8 | 8.5 | 59.0 | 30.8 | 46.29 |
+| James Harden (LAC) | DET vs LAC 12/28/2025 | 40.0 | 28 | 54.0 | 8.2 | 70.5 | −9.0 | 45.68 |
 
-**EHI range: 53.7–63.8 · std dev: 3.12 · mean: 58.7**
+**Star EHI range: 46.29–67.77 · std dev: 5.37 · mean: 56.18 · n=17 game-rows**
+**Global range (218 rows): 26.33–75.76 · mean: 55.69 · std: 7.81**
 
-Next steps: expand to games with known bad actors, test SPS penalties on flagrant foul games, sensitivity analysis on weights.
+Next step: **`run_season.py`** — full 2025-26 season run across all game IDs.
 
 ---
 
@@ -375,32 +381,44 @@ Next steps: expand to games with known bad actors, test SPS penalties on flagran
 
 ```python
 # Weights
-W_SQS = 0.35
+W_SQS = 0.45
 W_FDS = 0.20
-W_FTP = 0.20
-W_SPS = 0.15
-W_DES = 0.10
+W_FTP = 0.25
+W_SPS = 0.05
+W_DES = 0.05
+
+# Activity filter
+MIN_MINUTES_THRESHOLD = 8   # players below this excluded entirely
 
 # SQS
-CHUCK_THRESHOLD   = 0.38
-CONTESTED_MULT    = 1.40
-SELF_CREATED_MULT = 1.25
-ASSISTED_DEMERIT  = 0.90
-OPEN_MISS_MULT    = 0.85
-CONTESTED_MISS_MULT = 0.50
+CHUCK_THRESHOLD          = 0.38
+SELF_CREATED_MULT        = 1.25
+ASSISTED_DEMERIT         = 0.90
+OPEN_MISS_MULT           = 0.85
+CONTESTED_MISS_MULT      = 0.50
+CHUCK_PENALTY_EXP        = 1.4
+CHUCK_PENALTY_MULT       = 3
+SQS_ZERO_SHOTS_BASELINE  = 50
+SQS_SC_XEFG_THRESHOLD    = 0.50
+SQS_AST_XEFG_THRESHOLD   = 0.45
 
 # FDS
-VOLUME_PENALTY_BASE = 1.0   # DEPRECATED — not applied; kept for reference
-VOLUME_PENALTY_EXP  = 1.15  # DEPRECATED — not applied; kept for reference
+VOLUME_PENALTY_BASE = 1.0   # DEPRECATED
+VOLUME_PENALTY_EXP  = 1.15  # DEPRECATED
 FT_PCT_THRESHOLD    = 0.60
 FT_PCT_MODIFIER     = 0.92
-ZERO_FTA_BASELINE   = 72
+ZERO_FTA_BASELINE   = 50
 
 # FTP
-FT_DEP_THRESHOLD    = 0.50
-FT_DEP_PENALTY_MULT = 0.15
-FT_DEP_PENALTY_EXP  = 1.3
-ZERO_POINTS_BASELINE = 75
+FTP_RATIO_WEIGHT              = 70   # (1 - dep_ratio) * 70
+FTP_VOLUME_CAP                = 30   # min(total_pts, 30)
+FT_DEP_THRESHOLD              = 0.50   # DEPRECATED
+FT_DEP_PENALTY_MULT           = 0.15   # DEPRECATED
+FT_DEP_PENALTY_EXP            = 1.3    # DEPRECATED
+ZERO_POINTS_BASELINE          = 50     # DEPRECATED
+FTP_SCORING_BONUS_PTS_THRESHOLD = 30   # DEPRECATED
+FTP_SCORING_BONUS_DEP_CAP       = 0.35 # DEPRECATED
+FTP_SCORING_BONUS_MULT          = 0.3  # DEPRECATED
 
 # SPS
 TECH_PENALTY        = 18
@@ -417,7 +435,7 @@ STEAL_WEIGHT        = 5.0
 BLOCK_WEIGHT        = 5.0
 DREB_WEIGHT         = 2.0
 CHARGE_WEIGHT       = 15.0
-DES_NORMALIZATION   = 30
+DES_NORMALIZATION   = 80    # elite 36-min game ≈ 80 weighted pts → DES_raw=100
 FOUL_PENALTY_BASE   = 5
 FOUL_PENALTY_EXP    = 1.3
 DEF_FOUL_MULT       = 1.0
@@ -432,9 +450,8 @@ GARBAGE_TIME_LEG_CAP      = 0.20
 GARBAGE_FTA_THRESHOLD     = 0.30
 GARBAGE_FTP_PENALTY_MULT  = 0.20
 GARBAGE_FTP_PENALTY_EXP   = 1.3
-
 ```
 
 ---
 
-*EHI v1.0 — designed for per-game, absolute scoring across all NBA players*
+*EHI v1.1 — unclamped sub-scores, ratio+volume FTP, SQS volume-quality bonus, 12-game validation complete*

@@ -5,7 +5,7 @@
 The **Ethical Hoops Index (EHI)** is a per-game, absolute (0–100) metric that measures how "ethically" an NBA player performed. It rewards skill-based scoring, disciplined defense, and clean conduct while penalizing manipulation, deception, and laziness.
 
 ```
-EHI = 0.35(SQS) + 0.20(FDS) + 0.20(FTP) + 0.15(SPS) + 0.10(DES)
+EHI = 0.45(SQS) + 0.20(FDS) + 0.25(FTP) + 0.05(SPS) + 0.05(DES)
 ```
 
 ---
@@ -14,11 +14,11 @@ EHI = 0.35(SQS) + 0.20(FDS) + 0.20(FTP) + 0.15(SPS) + 0.10(DES)
 
 | Code | Name | Weight | What it measures |
 |------|------|--------|-----------------|
-| SQS | Shot Quality Score | 35% | Did the player take shots a skilled, ethical player would take? Rewards contested makes and self-created quality looks; penalizes low-xeFG% chucks. |
-| FDS | Foul Drawing Score | 20% | Did the player earn their free throws or manufacture them? Scores legitimacy per foul drawn; `FDS = clamp(avg_legitimacy × 100)` plus FT% modifier. No volume penalty. |
-| FTP | FT Dependency Score | 20% | What fraction of points came from free throws vs. field goals? Penalizes exponentially above 50% dependency. |
-| SPS | Sportsmanship Score | 15% | Did the player conduct themselves with integrity? Starts at 100; penalties only. Exponential stacking per violation type. |
-| DES | Defensive Effort Score | 10% | Did the player compete defensively? Weighted sum of contested shots, deflections, steals, blocks, defensive rebounds, charges taken; minus foul penalty. |
+| SQS | Shot Quality Score | 45% | Did the player take shots a skilled, ethical player would take? Rewards contested makes and self-created quality looks; penalizes low-xeFG% chucks. Volume-quality bonus for 15+ shots at avg xeFG ≥ 0.52. |
+| FDS | Foul Drawing Score | 20% | Did the player earn their free throws or manufacture them? Scores legitimacy per foul drawn; `FDS = avg_legitimacy × 100` plus FT% modifier. Zero-FTA baseline = 50. No volume penalty. |
+| FTP | FT Dependency Score | 25% | Combined ratio + volume score: `(1 − FT_dep_ratio) × 70 + min(pts, 30)`. Naturally bounded 0–100; no separate edge-case handling needed. |
+| SPS | Sportsmanship Score | 5% | Did the player conduct themselves with integrity? Starts at 100; penalties only. Exponential stacking per violation type. Floor at 0 (only sub-score with a clamp). |
+| DES | Defensive Effort Score | 5% | Did the player compete defensively? Weighted sum of contested shots, deflections, steals, blocks, defensive rebounds, charges taken; minus foul penalty. Normalized against 80-point elite baseline; unclamped. |
 
 All constants (weights, thresholds, multipliers) live in `config.py`.
 
@@ -46,19 +46,23 @@ Pulls all raw data for a single game from `nba_api` and returns it as a dict of 
 
 ## compute_ehi.py
 
-Consumes the dict from `pipeline.main()` and computes EHI sub-scores for every active player (DNPs filtered out by `minutes > 0`).
+Consumes the dict from `pipeline.main()` and computes EHI sub-scores for every active player. Players with fewer than `MIN_MINUTES_THRESHOLD` (8) minutes are excluded entirely from all results and DB saves.
 
 ### Implemented
 
 **FTP — FT Dependency Score**
-- Inputs: `freeThrowsMade`, `twoPointersMade`, `threePointersMade`, `fieldGoalsMade`
-- Formula: `FTP_raw = (1 − ft_dep_ratio) × 100`; exponential extra penalty above 50% dependency
-- Edge cases: zero points → baseline 75; FGM == 0 and FTM > 0 → score 0
-- Constants: `FT_DEP_THRESHOLD`, `FT_DEP_PENALTY_MULT`, `FT_DEP_PENALTY_EXP`, `ZERO_POINTS_BASELINE`
+- Inputs: `freeThrowsMade`, `twoPointersMade`, `threePointersMade`
+- Formula: `ratio_score = (1 − ft_dep_ratio) × FTP_RATIO_WEIGHT (70)`; `volume_score = min(total_pts, FTP_VOLUME_CAP (30))`; `FTP = ratio_score + volume_score`
+- Naturally bounded [0, 100] by construction — no clamping needed
+- Zero scorers: `dep_ratio = 0 → ratio = 70, volume = 0 → FTP = 70` (neutral baseline)
+- Pure FT scorers: `dep_ratio = 1.0 → ratio = 0, volume = min(ftm, 30)`
+- Constants: `FTP_RATIO_WEIGHT = 70`, `FTP_VOLUME_CAP = 30`
+- Deprecated (not applied): `FT_DEP_THRESHOLD`, `FT_DEP_PENALTY_MULT`, `FT_DEP_PENALTY_EXP`, `ZERO_POINTS_BASELINE`
 
 **SPS — Sportsmanship Score**
 - Inputs: PlayByPlayV3 filtered by `personId`
-- Formula: starts at 100; `penalty_type = base × (count ^ SPS_STACK_EXP)` per violation type; `SPS = clamp(100 − sum, 0, 100)`
+- Formula: starts at 100; `penalty_type = base × (count ^ SPS_STACK_EXP)` per violation type; `SPS = max(0, 100 − sum)`
+- **Only sub-score with a clamp** — floor at 0, no ceiling
 - Violation types detected via `actionType`/`subType` matching (case-insensitive):
   - Technical: `actionType='Foul'`, `subType='Technical'`
   - Flagrant 1: `subType` in `('flagrant type 1', 'flagrant 1', ...)`
@@ -84,9 +88,9 @@ Sub-scores are built and validated one at a time before moving to the next:
 - [x] FTP — complete, validated
 - [x] SPS — complete, validated (Coulibaly 1 tech → SPS 82.0 confirmed)
 - [x] DES — complete, validated
-- [x] FDS — complete, validated; volume penalty removed after 12-game calibration (all stars scored FDS=0 at any config); FDS now = `clamp(avg_legitimacy × 100)` + FT% modifier
-- [x] SQS — complete, validated (Bam 83-pt game; per-shot breakdown printed)
-- [x] EHI aggregation — complete; validated across 12 games (EHI range 53.7–63.8, std dev 3.12)
+- [x] FDS — complete, validated; volume penalty removed; aggregate clamp removed; zero-FTA baseline = 50
+- [x] SQS — complete, validated (Bam 83-pt game; per-shot breakdown printed); volume-quality bonus added (15+ shots, avg xeFG ≥ 0.52)
+- [x] EHI aggregation — complete; validated across 12 games (EHI range 46.29–67.77, std dev 5.37, n=17 star game-rows)
 
 ---
 
@@ -98,4 +102,16 @@ Sub-scores are built and validated one at a time before moving to the next:
 
 **FDS defender proximity — implemented via `PlayerDashPtShots`:** `build_proximity_index(proximity_df)` in `compute_ehi.py` converts season-level `CLOSE_DEF_DIST_RANGE` bucket data into per-player `{very_tight_pct, tight_pct}` fractions. `compute_fds` applies `prox_bonus = very_tight_pct × 0.40 + tight_pct × 0.25` per shooting foul; falls back to `+0.25` flat if no data available. Season-level data used as game-level proxy because `PlayerDashPtShots` returns 0 rows when date-filtered to a single game.
 
-**FDS volume penalty — removed:** After 12-game validation, `VOLUME_PENALTY_BASE` and `VOLUME_PENALTY_EXP` are no longer applied. All high-FTA star players scored FDS=0 under every tested config (A/B/C) because legitimate avg_leg (~0.25–0.45) can never overcome the volume penalty at 40+ FTA. FDS now equals `clamp(avg_legitimacy × 100, 0, 100)` plus the FT% modifier, letting legitimacy quality fully determine the score.
+**Sub-score clamping removed:** All sub-scores except SPS now float freely — no floor, no ceiling. SPS keeps a floor of 0 (`max(0, 100 − penalties)`). DES and SQS can exceed 100 for exceptional performances. FTP is naturally bounded [0, 100] by formula construction and needs no clamp.
+
+**DES normalization = 80:** `DES_NORMALIZATION` was recalibrated from 30 → 80. Baseline: a player generating 80 weighted positive-defensive points (8 contested × 3.5 + 5 deflections × 4.0 + 2 steals × 5.0 + 2 blocks × 5.0 + 6 drebs × 2.0 = 80) scores `des_raw = 100` before foul penalty. After 2–3 typical fouls this lands ~80–88. Players with extraordinary games (e.g. Bam's 83-pt game) legitimately exceed 100.
+
+**SQS volume-quality bonus:** After computing `raw_mean` across all shots, if `n_shots >= 15` and `avg_xeFG >= 0.52`, a bonus of `(n_shots − 14) × 0.5` is added to SQS. Rewards players who sustain high shot quality over high volume.
+
+**FDS volume penalty — removed:** After 12-game validation, `VOLUME_PENALTY_BASE` and `VOLUME_PENALTY_EXP` are no longer applied. FDS = `avg_legitimacy × 100` (unclamped) plus FT% modifier. Zero-FTA baseline dropped from 72 → 50.
+
+**FTP rework — ratio + volume:** The old purely-linear formula `(1 − dep) × 100` with an exponential kick above 50% dependency has been replaced with `(1 − dep) × 70 + min(pts, 30)`. This bakes volume directly into the base score. A player must both minimize FT dependency AND score field goals to reach 100.
+
+**Minimum 8-minute filter:** Players below `MIN_MINUTES_THRESHOLD = 8` minutes are excluded from EHI computation, DB saves, and all leaderboards entirely.
+
+**Next step — `run_season.py`:** Full 2025-26 season run. Script does not yet exist; needs to iterate all game IDs for the season and call the same pipeline/compute loop used in `run_validation.py`.
