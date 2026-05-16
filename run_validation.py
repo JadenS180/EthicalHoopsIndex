@@ -340,6 +340,8 @@ def run_game(spec: dict, game_num: int, total: int) -> None:
             away_team = meta["away_team"],
             season    = season,
         )
+        shots_saved = database.save_shots(data["shots"], game_id)
+        print(f"  Saved {shots_saved} shot rows to ehi.db")
         saved = database.save_player_results(results, game_id, meta["date"])
 
         if shots_failed:
@@ -378,6 +380,7 @@ def main() -> None:
 
     database.init_db()
     print("Database initialised.")
+    compute_ehi.print_empirical_xefg_table()
 
     for run_idx, (i, spec) in enumerate(games_to_run):
         run_game(spec, i, len(VALIDATION_GAMES))

@@ -35,6 +35,9 @@ from config import (
     DREB_WEIGHT,
     CHARGE_WEIGHT,
     DES_NORMALIZATION,
+    DES_NORM_CENTER,
+    DES_NORM_FORWARD,
+    DES_NORM_GUARD,
     FOUL_PENALTY_BASE,
     FOUL_PENALTY_EXP,
     DEF_FOUL_MULT,
@@ -47,6 +50,10 @@ from config import (
     FT_PCT_THRESHOLD,
     FT_PCT_MODIFIER,
     ZERO_FTA_BASELINE,
+    FDS_REP_PENALTY_3RD,
+    FDS_REP_PENALTY_4TH,
+    FDS_CENTER_PAINT_BONUS,
+    FDS_GUARD_3PT_PENALTY,
     # Garbage-time constants (shared FDS + FTP)
     GARBAGE_TIME_LEAD,
     GARBAGE_TIME_MINUTES_LEFT,
@@ -68,6 +75,9 @@ from config import (
     SQS_ZERO_SHOTS_BASELINE,
     SQS_SC_XEFG_THRESHOLD,
     SQS_AST_XEFG_THRESHOLD,
+    SQS_XEFG_THRESHOLD_CENTER,
+    SQS_XEFG_THRESHOLD_FORWARD,
+    SQS_XEFG_THRESHOLD_GUARD,
 )
 
 
@@ -310,14 +320,20 @@ def build_foul_type_index(pbp: pd.DataFrame) -> dict[int, dict[str, int]]:
     return index
 
 
-def compute_des(row: pd.Series, hustle: pd.DataFrame, foul_type_index: dict) -> dict:
+def compute_des(
+    row: pd.Series,
+    hustle: pd.DataFrame,
+    foul_type_index: dict,
+    position: str = "forward",
+) -> dict:
     """
     Defensive Effort Score for one player (EHI ref §5).
 
     hustle          : BoxScoreHustleV2 DataFrame (full game, both teams)
     foul_type_index : output of build_foul_type_index(pbp)
+    position        : 'center' | 'forward' | 'guard' — determines normalization baseline
 
-    Positive signals come from hustle stats + box score.
+    Normalization baselines: center=110, forward=85, guard=60.
     Foul penalty is differentiated by type (defensive × 1.0,
     offensive × 1.3, loose-ball × 0.5).
     If every defensive stat is zero → DES = ZERO_DEF_BASELINE (25).
@@ -366,7 +382,8 @@ def compute_des(row: pd.Series, hustle: pd.DataFrame, foul_type_index: dict) -> 
         + drebs       * DREB_WEIGHT
         + charges     * CHARGE_WEIGHT
     )
-    des_raw = (positive_total / DES_NORMALIZATION) * 100.0
+    norm    = DES_NORM_CENTER if position == "center" else (DES_NORM_GUARD if position == "guard" else DES_NORM_FORWARD)
+    des_raw = (positive_total / norm) * 100.0
 
     # ── Foul penalty ──────────────────────────────────────────────────────────
     fouls         = foul_type_index.get(pid, {})
@@ -668,22 +685,30 @@ def build_proximity_index(proximity_df: pd.DataFrame) -> dict[int, dict]:
 
 # ─── SUB-SCORE: FDS (Part 2 — scoring) ───────────────────────────────────────
 
-def compute_fds(row: pd.Series, foul_drawn_index: dict, proximity_index: dict | None = None) -> dict:
+def compute_fds(
+    row: pd.Series,
+    foul_drawn_index: dict,
+    proximity_index: dict | None = None,
+    position: str = "forward",
+) -> dict:
     """
     Foul Drawing Score for one player (EHI ref §2).
 
     foul_drawn_index : output of build_foul_drawn_events(pbp, shots)
+    position         : 'center' | 'forward' | 'guard' — applies per-foul location modifier
 
     Per-foul legitimacy signals (0→1):
       +0.40  defender 0-2ft (very tight) — from PlayerDashPtShots proximity distribution
       +0.25  defender 2-4ft (tight) — same source; combined as weighted avg per player
              Fallback: +0.25 flat assumed if no proximity data available.
+      +0.10  center drawing paint foul (position natural)
+      −0.10  guard drawing 3pt foul (higher suspicion)
       +0.20  assisted (catch-and-shoot, from PBP description)
       +0.20  and-1 (made shot + foul at same clock)
-      −0.20  3rd foul of same subtype in this game
-      −0.30  4th+ foul of same subtype in this game
+      −0.10  3rd foul of same subtype in this game (softened from −0.20)
+      −0.20  4th+ foul of same subtype in this game (softened from −0.30)
       cap 0.45  off-ball fouls (personal/loose-ball in bonus)
-      cap 0.20  garbage time (Q4, lead ≥ 20, ≤ 5 min left)
+      cap 0.20  garbage time (Q4, lead ≥ 25, ≤ 5 min left)
 
     Aggregate:
       FDS_raw        = mean(legitimacy) × 100
@@ -746,6 +771,15 @@ def compute_fds(row: pd.Series, foul_drawn_index: dict, proximity_index: dict | 
             else:
                 signals.append("+0.25 dist≤4ft(assumed)")
 
+        # Position modifier: center in paint is natural contact; guard drawing 3pt is suspicious
+        if not off_ball:
+            if position == "center" and location == "paint":
+                leg += FDS_CENTER_PAINT_BONUS
+                signals.append(f"+{FDS_CENTER_PAINT_BONUS:.2f} center_paint")
+            elif position == "guard" and location == "3pt":
+                leg -= FDS_GUARD_3PT_PENALTY
+                signals.append(f"-{FDS_GUARD_3PT_PENALTY:.2f} guard_3pt")
+
         if assisted:
             leg += 0.20
             signals.append("+0.20 assisted")
@@ -755,11 +789,11 @@ def compute_fds(row: pd.Series, foul_drawn_index: dict, proximity_index: dict | 
             signals.append("+0.20 and-1")
 
         if count == 3:
-            leg -= 0.20
-            signals.append(f"-0.20 rep#{count}")
+            leg -= FDS_REP_PENALTY_3RD
+            signals.append(f"-{FDS_REP_PENALTY_3RD:.2f} rep#{count}")
         elif count >= 4:
-            leg -= 0.30
-            signals.append(f"-0.30 rep#{count}")
+            leg -= FDS_REP_PENALTY_4TH
+            signals.append(f"-{FDS_REP_PENALTY_4TH:.2f} rep#{count}")
 
         # Off-ball cap (applied before garbage-time cap)
         if off_ball and leg > 0.45:
@@ -823,9 +857,28 @@ def compute_fds(row: pd.Series, foul_drawn_index: dict, proximity_index: dict | 
     )
 
 
-# ─── SUB-SCORE: SQS ───────────────────────────────────────────────────────────
+# ─── POSITION MAPPING ─────────────────────────────────────────────────────────
 
-_XEFG_TABLE: dict[str, float] = {
+def map_position(pos: str) -> str:
+    """
+    Map BoxScoreTraditionalV3 position string to 'center', 'forward', or 'guard'.
+    Empty or unrecognised values default to 'forward' (neutral baseline).
+    """
+    p = pos.strip().upper()
+    if p == "C":
+        return "center"
+    if p in ("F-C", "C-F"):
+        return "forward"
+    if p in ("F", "PF", "SF"):
+        return "forward"
+    if p in ("G", "PG", "SG", "G-F", "F-G"):
+        return "guard"
+    return "forward"   # default / unknown
+
+
+# ─── EMPIRICAL xeFG% FROM DATABASE ────────────────────────────────────────────
+
+_HARDCODED_XEFG: dict[str, float] = {
     "restricted area":        XEFG_AT_RIM,
     "in the paint (non-ra)":  XEFG_PAINT_NON_RIM,
     "mid-range":              XEFG_MID_RANGE,
@@ -834,6 +887,65 @@ _XEFG_TABLE: dict[str, float] = {
     "above the break 3":      XEFG_ABOVE_BREAK_3,
     "backcourt":              XEFG_BACKCOURT,
 }
+
+
+def _query_xefg_db_stats() -> dict[str, tuple[float, int]]:
+    """Query ehi.db shots table. Returns {zone_lower: (avg_made, count)} for all zones."""
+    try:
+        import sqlite3
+        from database import DB_PATH
+        with sqlite3.connect(DB_PATH) as conn:
+            rows = conn.execute(
+                "SELECT shot_zone, AVG(made), COUNT(*) FROM shots GROUP BY shot_zone"
+            ).fetchall()
+        return {str(z).lower(): (round(float(xefg), 4), int(n)) for z, xefg, n in rows}
+    except Exception:
+        return {}
+
+
+def _build_xefg_table(min_shots: int = 50) -> dict[str, float]:
+    """
+    Build the xeFG lookup table: start with hardcoded values, then override
+    any zone that has ≥min_shots empirical shots in ehi.db.
+    """
+    table = dict(_HARDCODED_XEFG)
+    for zone, (xefg, n) in _query_xefg_db_stats().items():
+        if zone in table and n >= min_shots:
+            table[zone] = xefg
+    return table
+
+
+def print_empirical_xefg_table(min_shots: int = 50) -> None:
+    """Print comparison of empirical (ehi.db shots table) vs hardcoded xeFG% by zone."""
+    db_stats = _query_xefg_db_stats()
+    W = 74
+    print("\n" + "=" * W)
+    print("xeFG% Table — Empirical (ehi.db) vs Hardcoded Fallback")
+    print(f"  Empirical overrides hardcoded when zone has ≥{min_shots} shots in DB")
+    print("=" * W)
+    print(f"  {'Zone':<28}  {'Empirical':>10}  {'N':>6}  {'Hardcoded':>10}  {'Active':>10}")
+    print("  " + "─" * 70)
+    for zone, hc in _HARDCODED_XEFG.items():
+        emp_data = db_stats.get(zone)
+        if emp_data:
+            emp_val, n = emp_data
+            emp_str  = f"{emp_val:.4f}"
+            n_str    = str(n)
+            active   = f"{emp_val:.4f}" if n >= min_shots else f"{hc:.4f}*"
+        else:
+            emp_str = "—"
+            n_str   = "0"
+            active  = f"{hc:.4f}*"
+        print(f"  {zone:<28}  {emp_str:>10}  {n_str:>6}  {hc:.4f}      {active:>10}")
+    print("  * = hardcoded fallback (insufficient empirical data)")
+    total_shots = sum(n for _, n in db_stats.values())
+    print(f"  Total shots in DB: {total_shots}")
+    print("=" * W)
+
+
+# ─── SUB-SCORE: SQS ───────────────────────────────────────────────────────────
+
+_XEFG_TABLE: dict[str, float] = _build_xefg_table()
 
 
 def _zone_to_xefg(zone: str) -> float:
@@ -917,11 +1029,12 @@ def build_sqs_data(shots: pd.DataFrame, pbp: pd.DataFrame) -> dict[int, list[dic
     return result
 
 
-def compute_sqs(row: pd.Series, sqs_data: dict) -> dict:
+def compute_sqs(row: pd.Series, sqs_data: dict, position: str = "forward") -> dict:
     """
     Shot Quality Score for one player (EHI ref §1).
 
     sqs_data : output of build_sqs_data(shots, pbp)
+    position : 'center' | 'forward' | 'guard' — determines volume-quality xeFG threshold
 
     Per-shot score:
       Made shot               → xeFG% × 100 × 1.0
@@ -930,6 +1043,8 @@ def compute_sqs(row: pd.Series, sqs_data: dict) -> dict:
                                 − (chuck_count ^ 1.4) × 3  (cumulative penalty)
     Self-created bonus  : ×1.25 if assisted=False, made=True, xeFG% ≥ 0.50
     Assisted demerit    : ×0.90 if assisted=True,  xeFG% < 0.45
+    Volume-quality bonus: (shots − 14) × 0.5 if shots ≥ 15 and avg xeFG ≥ threshold
+      Threshold by position: center=0.58, forward=0.53, guard=0.50
     SQS = clamp(mean(shot_scores), 0, 100)
     Zero shots → SQS_ZERO_SHOTS_BASELINE (50)
     """
@@ -991,8 +1106,13 @@ def compute_sqs(row: pd.Series, sqs_data: dict) -> dict:
     n_shots   = len(shots)
     avg_xefg  = sum(s["xefg"] for s in shots) / n_shots
 
+    xefg_threshold = (
+        SQS_XEFG_THRESHOLD_CENTER if position == "center" else
+        SQS_XEFG_THRESHOLD_GUARD  if position == "guard"  else
+        SQS_XEFG_THRESHOLD_FORWARD
+    )
     volume_bonus = 0.0
-    if n_shots >= 15 and avg_xefg >= 0.52:
+    if n_shots >= 15 and avg_xefg >= xefg_threshold:
         volume_bonus = (n_shots - 14) * 0.5
 
     sqs = raw_mean + volume_bonus
@@ -1005,7 +1125,7 @@ def compute_sqs(row: pd.Series, sqs_data: dict) -> dict:
         avg_xefg=round(avg_xefg, 4),
         volume_bonus=round(volume_bonus, 2),
         SQS=round(sqs, 2),
-        note=(f"vol_bonus+{volume_bonus:.1f}(n={n_shots},xeFG={avg_xefg:.3f})" if volume_bonus > 0 else ""),
+        note=(f"vol_bonus+{volume_bonus:.1f}(n={n_shots},xeFG={avg_xefg:.3f},thr={xefg_threshold:.2f})" if volume_bonus > 0 else ""),
     )
 
 
@@ -1043,11 +1163,12 @@ def compute_all(data: dict) -> tuple[pd.DataFrame, dict]:
     sqs_detail = {}
 
     for _, row in active.iterrows():
+        position = map_position(str(row.get("position", "")))
         ftp = compute_ftp(row)
         sps = compute_sps(row, violation_index)
-        des = compute_des(row, hustle, foul_type_index)
-        fds = compute_fds(row, foul_drawn_index, proximity_index)
-        sqs = compute_sqs(row, sqs_data)
+        des = compute_des(row, hustle, foul_type_index, position)
+        fds = compute_fds(row, foul_drawn_index, proximity_index, position)
+        sqs = compute_sqs(row, sqs_data, position)
 
         pid = int(row["personId"])
         fds_detail[pid] = fds
@@ -1067,6 +1188,7 @@ def compute_all(data: dict) -> tuple[pd.DataFrame, dict]:
             "personId": pid,
             "player":   f"{row['firstName']} {row['familyName']}",
             "team":     row["teamTricode"],
+            "position": position,
             "min":      round(row["minutes_dec"], 1),
             # ── Box score inputs ──────────────────────────────────────────
             "pts":      int(row["points"]),
@@ -1272,8 +1394,8 @@ def print_des_report(df: pd.DataFrame) -> None:
     print("\n" + "=" * W)
     print("DES — Defensive Effort Score")
     print(f"  Weights: CST×{CONTESTED_WEIGHT}  DFL×{DEFLECTION_WEIGHT}  STL×{STEAL_WEIGHT}"
-          f"  BLK×{BLOCK_WEIGHT}  DREB×{DREB_WEIGHT}  CHG×{CHARGE_WEIGHT}"
-          f"  norm÷{DES_NORMALIZATION}")
+          f"  BLK×{BLOCK_WEIGHT}  DREB×{DREB_WEIGHT}  CHG×{CHARGE_WEIGHT}")
+    print(f"  Norm by position: C÷{DES_NORM_CENTER}  F÷{DES_NORM_FORWARD}  G÷{DES_NORM_GUARD}")
     print(f"  Foul mults: def×{DEF_FOUL_MULT}  off×{OFF_FOUL_MULT}  lb×{LOOSE_BALL_MULT}"
           f"  →  penalty = (adj_fouls^{FOUL_PENALTY_EXP}) × {FOUL_PENALTY_BASE}")
     print("=" * W)
@@ -1665,11 +1787,79 @@ def print_bam_breakdown(df: pd.DataFrame, target_name: str = "Bam Adebayo") -> N
     print()
 
 
+# ─── VALIDATION TABLE ─────────────────────────────────────────────────────────
+
+def print_validation_table(pts_threshold: int = 20) -> None:
+    """
+    Query ehi.db and print the star-player validation table.
+    Shows all player-game rows with pts ≥ pts_threshold, sorted by EHI desc.
+    Positions shown from DB (NULL → '?' until next validation re-run).
+    """
+    import sqlite3
+    from database import DB_PATH
+
+    with sqlite3.connect(DB_PATH) as conn:
+        rows = conn.execute(
+            """
+            SELECT pg.player_name,
+                   COALESCE(pg.position, '?') AS pos,
+                   pg.team,
+                   g.home_team || ' vs ' || g.away_team AS matchup,
+                   pg.date,
+                   pg.points,
+                   pg.SQS, pg.FDS, pg.FTP, pg.SPS, pg.DES, pg.EHI
+            FROM player_games pg
+            JOIN games g USING (game_id)
+            WHERE pg.points >= ?
+            ORDER BY pg.EHI DESC
+            """,
+            (pts_threshold,),
+        ).fetchall()
+
+    if not rows:
+        print(f"\n  No rows with pts ≥ {pts_threshold} in ehi.db.")
+        return
+
+    import statistics
+    ehis = [r[11] for r in rows]
+    ehi_min  = min(ehis)
+    ehi_max  = max(ehis)
+    ehi_mean = statistics.mean(ehis)
+    ehi_std  = statistics.stdev(ehis) if len(ehis) > 1 else 0.0
+
+    W = 120
+    print("\n" + "=" * W)
+    print(f"EHI Validation Table — star players (pts ≥ {pts_threshold}), n={len(rows)}")
+    print(f"  EHI range: {ehi_min:.2f}–{ehi_max:.2f}   mean: {ehi_mean:.2f}   std dev: {ehi_std:.2f}")
+    print(f"  Positions: populated from DB (? = pre-rerun rows without position data)")
+    print("=" * W)
+    print(
+        f"  {'Rk':>3}  {'Player':<26}{'Pos':>5}{'Tm':>4}"
+        f"  {'Date':<12}  {'PTS':>4}"
+        f"  {'SQS':>6}  {'FDS':>6}  {'FTP':>6}  {'SPS':>6}  {'DES':>7}  │{'EHI':>7}"
+    )
+    print("  " + "─" * (W - 2))
+    for rank, r in enumerate(rows, 1):
+        name, pos, team, matchup, date, pts, sqs, fds, ftp, sps, des, ehi = r
+        print(
+            f"  {rank:>3}  {name:<26}{pos:>5}{team:>4}"
+            f"  {date:<12}  {pts:>4}"
+            f"  {sqs:>6.1f}  {fds:>6.1f}  {ftp:>6.1f}  {sps:>6.1f}  {des:>7.1f}  │{ehi:>7.2f}"
+        )
+    print("  " + "─" * (W - 2))
+    print(
+        f"  EHI — min:{ehi_min:.2f}  max:{ehi_max:.2f}"
+        f"  mean:{ehi_mean:.2f}  std:{ehi_std:.2f}  n={len(rows)}"
+    )
+    print("=" * W)
+
+
 # ─── ENTRY POINT ──────────────────────────────────────────────────────────────
 
 if __name__ == "__main__":
     from pipeline import main as pull_data
 
+    print_empirical_xefg_table()
     data             = pull_data()
     results, detail  = compute_all(data)
     print_ftp_report(results)

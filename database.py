@@ -10,6 +10,7 @@ Tables
 
 import sqlite3
 from pathlib import Path
+from typing import Optional
 
 import pandas as pd
 
@@ -21,7 +22,7 @@ def get_connection() -> sqlite3.Connection:
 
 
 def init_db() -> None:
-    """Create all tables if they do not already exist."""
+    """Create all tables if they do not already exist, then run any pending migrations."""
     with get_connection() as conn:
         conn.executescript("""
             CREATE TABLE IF NOT EXISTS games (
@@ -50,6 +51,17 @@ def init_db() -> None:
                 UNIQUE(player_id, game_id)
             );
 
+            CREATE TABLE IF NOT EXISTS shots (
+                id        INTEGER PRIMARY KEY AUTOINCREMENT,
+                game_id   TEXT NOT NULL,
+                player_id INTEGER NOT NULL,
+                shot_zone TEXT NOT NULL,
+                made      INTEGER NOT NULL
+            );
+
+            CREATE INDEX IF NOT EXISTS idx_shots_game ON shots(game_id);
+            CREATE INDEX IF NOT EXISTS idx_shots_zone ON shots(shot_zone);
+
             CREATE TABLE IF NOT EXISTS validation_notes (
                 id                  INTEGER PRIMARY KEY AUTOINCREMENT,
                 game_id             TEXT NOT NULL,
@@ -60,6 +72,15 @@ def init_db() -> None:
                 FOREIGN KEY (game_id) REFERENCES games(game_id)
             );
         """)
+        _migrate_db(conn)
+
+
+def _migrate_db(conn: sqlite3.Connection) -> None:
+    """Add columns introduced after the initial schema without dropping existing data."""
+    try:
+        conn.execute("ALTER TABLE player_games ADD COLUMN position TEXT")
+    except sqlite3.OperationalError:
+        pass  # column already exists
 
 
 def save_game(
@@ -95,6 +116,38 @@ def save_validation_note(
         )
 
 
+def save_shots(shots_df: pd.DataFrame, game_id: str) -> int:
+    """
+    Save shot-chart rows for one game to the shots table.
+    Clears any existing shots for this game first (idempotent).
+    Returns the number of rows written.
+    """
+    if shots_df.empty:
+        return 0
+
+    rows = []
+    for _, s in shots_df.iterrows():
+        try:
+            pid  = int(s["PLAYER_ID"])
+            zone = str(s.get("SHOT_ZONE_BASIC", "")).lower().strip()
+            made = int(s.get("SHOT_MADE_FLAG", 0))
+        except (KeyError, TypeError, ValueError):
+            continue
+        if zone:
+            rows.append((game_id, pid, zone, made))
+
+    if not rows:
+        return 0
+
+    with get_connection() as conn:
+        conn.execute("DELETE FROM shots WHERE game_id = ?", (game_id,))
+        conn.executemany(
+            "INSERT INTO shots (game_id, player_id, shot_zone, made) VALUES (?, ?, ?, ?)",
+            rows,
+        )
+    return len(rows)
+
+
 def save_player_results(df: pd.DataFrame, game_id: str, date: str) -> int:
     """
     Upsert one row per player in df.
@@ -116,14 +169,15 @@ def save_player_results(df: pd.DataFrame, game_id: str, date: str) -> int:
             float(r["SPS"]),
             float(r["DES"]),
             float(r["EHI"]),
+            str(r.get("position", "forward")),
         ))
 
     with get_connection() as conn:
         conn.executemany(
             """INSERT OR REPLACE INTO player_games
                (player_id, player_name, team, game_id, date,
-                minutes, points, SQS, FDS, FTP, SPS, DES, EHI)
-               VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)""",
+                minutes, points, SQS, FDS, FTP, SPS, DES, EHI, position)
+               VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)""",
             rows,
         )
 

@@ -55,12 +55,21 @@ SQS_ZERO_SHOTS_BASELINE  = 50
 SQS_SC_XEFG_THRESHOLD    = 0.50   # min xeFG% for self-created bonus
 SQS_AST_XEFG_THRESHOLD   = 0.45   # max xeFG% for assisted demerit
 
+# Per-position volume-quality xeFG% thresholds for SQS bonus
+SQS_XEFG_THRESHOLD_CENTER  = 0.58
+SQS_XEFG_THRESHOLD_FORWARD = 0.53
+SQS_XEFG_THRESHOLD_GUARD   = 0.50
+
 # ─── FDS CONSTANTS ──────────────────────────────────────────────────────────
 VOLUME_PENALTY_BASE = 1.0    # DEPRECATED — not applied in compute_fds
 VOLUME_PENALTY_EXP  = 1.15  # DEPRECATED — not applied in compute_fds
 FT_PCT_THRESHOLD    = 0.60
 FT_PCT_MODIFIER     = 0.92
 ZERO_FTA_BASELINE   = 50
+FDS_REP_PENALTY_3RD    = 0.10   # 3rd foul of same type (softened from 0.20)
+FDS_REP_PENALTY_4TH    = 0.20   # 4th+ foul of same type (softened from 0.30)
+FDS_CENTER_PAINT_BONUS = 0.10   # legitimacy bonus for centers drawing paint fouls
+FDS_GUARD_3PT_PENALTY  = 0.10   # legitimacy deduction for guards drawing 3pt fouls
 
 # ─── FTP CONSTANTS ──────────────────────────────────────────────────────────
 # Ratio component: (1 - FT_dep_ratio) × FTP_RATIO_WEIGHT  → max 70
@@ -92,7 +101,10 @@ STEAL_WEIGHT      = 5.0
 BLOCK_WEIGHT      = 5.0
 DREB_WEIGHT       = 2.0
 CHARGE_WEIGHT     = 15.0
-DES_NORMALIZATION = 80
+DES_NORMALIZATION = 80        # DEPRECATED — per-position norms now used
+DES_NORM_CENTER   = 110
+DES_NORM_FORWARD  = 85
+DES_NORM_GUARD    = 60
 FOUL_PENALTY_BASE = 5
 FOUL_PENALTY_EXP  = 1.3
 DEF_FOUL_MULT     = 1.0
@@ -101,7 +113,7 @@ LOOSE_BALL_MULT   = 0.5
 ZERO_DEF_BASELINE = 25
 
 # ─── GARBAGE TIME CONSTANTS ─────────────────────────────────────────────────
-GARBAGE_TIME_LEAD         = 20
+GARBAGE_TIME_LEAD         = 25
 GARBAGE_TIME_MINUTES_LEFT = 5
 GARBAGE_TIME_LEG_CAP      = 0.20
 GARBAGE_FTA_THRESHOLD     = 0.30
