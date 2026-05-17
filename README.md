@@ -314,7 +314,7 @@ Low-scoring centers (Robinson, Williams III, Sims) dominate the top-10 for two c
 
 ## Background
 
-Built as a resume project by a Computer Engineering student at UGA, combining data engineering, sports analytics, and novel metric design. The project demonstrates a full data pipeline from API ingestion to composite metric calculation using real NBA tracking data.
+Built as a resume project by Jaden Smiles, a 2nd year Computer Engineering student at UGA, combining data engineering, sports analytics, and novel metric design. The project demonstrates a full data pipeline from API ingestion to composite metric calculation using real NBA tracking data.
 
 ---
 
