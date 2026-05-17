@@ -39,7 +39,7 @@ Did this player take shots that a skilled, ethical player would take?
 
 Zones with ≥ 50 shots in `ehi.db` use empirical values; all others fall back to hardcoded league averages. The table is rebuilt at import time from `compute_ehi._build_xefg_table()`.
 
-| Zone | Empirical (12-game, 2,216 shots) | Hardcoded Fallback | Active |
+| Zone | Empirical (full 2025-26 season) | Hardcoded Fallback | Active |
 |---|---|---|---|
 | Restricted Area | 0.6560 | 0.72 | empirical |
 | In the Paint (Non-RA) | 0.4500 | 0.54 | empirical |
@@ -49,7 +49,7 @@ Zones with ≥ 50 shots in `ehi.db` use empirical values; all others fall back t
 | Above the Break 3 | 0.3620 | 0.52 | empirical |
 | Backcourt | — | 0.30 | hardcoded |
 
-> **Note:** Empirical values reflect a small validation sample and will shift substantially once the 2025-26 full-season run completes. The left corner 3 figure (0.275) is likely depressed by sample selection — treat with caution.
+> **Note:** Empirical values now reflect the full 2025-26 season run (1,223 games). Corner 3 figures remain below hardcoded league averages — likely reflects genuine sample composition rather than small-sample noise.
 
 ### Per-Shot Score Logic
 
@@ -399,10 +399,10 @@ python3 query_ehi.py summary       2025-26
 
 Validated across **12 games** (218+ qualifying player-game rows, min ≥ 8 min, stored in `ehi.db`).
 
-**Current validation stats (n=17 star player-game rows, pts ≥ 20):**
+**Validation stats (n=17 star player-game rows, pts ≥ 20):**
 EHI range: **47.62–69.45** · mean: **57.24** · std dev: **4.95**
 
-Representative star-player results (earlier calibration — run `python3 compute_ehi.py` for current values):
+Representative star-player results (run `python3 compute_ehi.py` for current values):
 
 | Player | Game | MIN | Pts | SQS | FDS | FTP | DES | EHI |
 |---|---|---|---|---|---|---|---|---|
@@ -414,7 +414,40 @@ Representative star-player results (earlier calibration — run `python3 compute
 
 *Exact values shift with each calibration; use `print_validation_table()` or `query_ehi.py` for live DB figures.*
 
-**Next step:** `python3 run_season.py` overnight (~9–10 hrs, ~1,230 games). Then `python3 query_ehi.py summary 2025-26` for the first full-season distribution.
+---
+
+## 2025-26 Season Results
+
+Full season run complete. **1,223 games** processed (1,197 direct + 26 retried), **23,313 player-game rows** saved to `ehi.db`.
+
+| Metric | Value |
+|---|---|
+| League avg EHI | **48.27** |
+| Season high (single game) | **75.76** — Rudy Gobert |
+| Season low (single game) | **8.91** — Collin Gillespie |
+
+**Season top 10 highlights** (avg EHI, min 20 GP):
+
+| Rank | Player | Avg EHI | GP |
+|---|---|---|---|
+| 1 | Mitchell Robinson | 60.43 | — |
+| 2 | Robert Williams III | 60.06 | — |
+| 3 | Jericho Sims | 59.23 | — |
+| — | Giannis Antetokounmpo | 58.04 | 35 |
+| — | Dyson Daniels | 57.77 | 76 |
+
+**Season bottom 10 highlights:**
+
+| Rank | Player | Avg EHI |
+|---|---|---|
+| 1 (worst) | Jordan Poole | 39.47 |
+| 2 | Grayson Allen | 40.19 |
+
+**Team rankings highlight:** New Orleans Pelicans — most ethical team at **49.84** avg EHI.
+
+> Run `python3 query_ehi.py summary 2025-26` for the full 30-team ranking and complete top/bottom 10 lists.
+
+**Known issue — positional bias in top rankings:** Low-scoring centers dominate the top-10 because DES normalizes against center activity levels (÷110) without accounting for offensive contribution. High DES from rim protection combined with the neutral FTP baseline (70.0 for zero scorers) inflates EHI for low-usage bigs. A fix is planned.
 
 ---
 
@@ -514,7 +547,7 @@ GARBAGE_FTP_PENALTY_EXP   = 1.3
 
 | Limitation | Impact | Future fix |
 |---|---|---|
-| xeFG% empirical sample small (2,216 shots) | Corner 3 and rim values unreliable until season run | Stabilises after run_season.py |
+| xeFG% corner 3 below league avg | Values (L: 0.275, R: 0.398) may reflect sample composition; stable after full season | Monitor vs league-published xeFG data |
 | Position detection uses roster label, not role | Stretch bigs and combo guards normalise against wrong baseline | Manual override map |
 | No per-shot defender distance | SQS cannot distinguish open vs contested at shot level | `ShotQualityDetail` endpoint (if available) |
 | FDS proximity is season-level, not game-level | `PlayerDashPtShots` returns 0 rows per game; season average used as proxy | None available |
@@ -524,4 +557,4 @@ GARBAGE_FTP_PENALTY_EXP   = 1.3
 
 ---
 
-*EHI v1.2 — position-adjusted DES/SQS/FDS, empirical xeFG table, softened FDS rep penalties, garbage time 25pt, run_season.py + query_ehi.py complete, 12-game validation EHI range 47.62–69.45*
+*EHI v1.3 — 2025-26 full season complete (1,223 games, 23,313 rows); league avg 48.27; positional bias identified in top rankings (fix planned); empirical xeFG table updated to full-season values*

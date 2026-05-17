@@ -1,0 +1,1066 @@
+2026-05-16 23:10:46 | game_id=0022500250  matchup=BKN vs BOS  JSONDecodeError: Expecting value: line 1 column 1 (char 0)
+Traceback (most recent call last):
+  File "/Users/jadensmiles/EthicalHoopsIndex/run_season.py", line 331, in run_game
+    data, shots_failed = pull_game_data(game_id)
+                         ~~~~~~~~~~~~~~^^^^^^^^^
+  File "/Users/jadensmiles/EthicalHoopsIndex/run_season.py", line 287, in pull_game_data
+    hustle = _pull_hustle(game_id)
+  File "/Users/jadensmiles/EthicalHoopsIndex/run_season.py", line 222, in _pull_hustle
+    return _with_retry(_fetch, label="BoxScoreHustleV2")
+  File "/Users/jadensmiles/EthicalHoopsIndex/run_season.py", line 75, in _with_retry
+    result = fn()
+  File "/Users/jadensmiles/EthicalHoopsIndex/run_season.py", line 219, in _fetch
+    return boxscorehustlev2.BoxScoreHustleV2(
+           ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~^
+        game_id=game_id, timeout=60
+        ^^^^^^^^^^^^^^^^^^^^^^^^^^^
+    ).get_data_frames()[0]
+    ^
+  File "/Library/Frameworks/Python.framework/Versions/3.13/lib/python3.13/site-packages/nba_api/stats/endpoints/boxscorehustlev2.py", line 81, in __init__
+    self.get_request()
+    ~~~~~~~~~~~~~~~~^^
+  File "/Library/Frameworks/Python.framework/Versions/3.13/lib/python3.13/site-packages/nba_api/stats/endpoints/boxscorehustlev2.py", line 91, in get_request
+    self.load_response()
+    ~~~~~~~~~~~~~~~~~~^^
+  File "/Library/Frameworks/Python.framework/Versions/3.13/lib/python3.13/site-packages/nba_api/stats/endpoints/boxscorehustlev2.py", line 94, in load_response
+    data_sets = self.nba_response.get_data_sets(self.endpoint)
+  File "/Library/Frameworks/Python.framework/Versions/3.13/lib/python3.13/site-packages/nba_api/stats/library/http.py", line 97, in get_data_sets
+    raw_dict = self.get_dict()
+  File "/Library/Frameworks/Python.framework/Versions/3.13/lib/python3.13/site-packages/nba_api/library/http.py", line 42, in get_dict
+    return json.loads(self._response)
+           ~~~~~~~~~~^^^^^^^^^^^^^^^^
+  File "/Library/Frameworks/Python.framework/Versions/3.13/lib/python3.13/json/__init__.py", line 346, in loads
+    return _default_decoder.decode(s)
+           ~~~~~~~~~~~~~~~~~~~~~~~^^^
+  File "/Library/Frameworks/Python.framework/Versions/3.13/lib/python3.13/json/decoder.py", line 345, in decode
+    obj, end = self.raw_decode(s, idx=_w(s, 0).end())
+               ~~~~~~~~~~~~~~~^^^^^^^^^^^^^^^^^^^^^^^
+  File "/Library/Frameworks/Python.framework/Versions/3.13/lib/python3.13/json/decoder.py", line 363, in raw_decode
+    raise JSONDecodeError("Expecting value", s, err.value) from None
+json.decoder.JSONDecodeError: Expecting value: line 1 column 1 (char 0)
+
+2026-05-16 23:34:11 | game_id=0022500057  matchup=WAS vs ATL  JSONDecodeError: Expecting value: line 1 column 1 (char 0)
+Traceback (most recent call last):
+  File "/Users/jadensmiles/EthicalHoopsIndex/run_season.py", line 331, in run_game
+    data, shots_failed = pull_game_data(game_id)
+                         ~~~~~~~~~~~~~~^^^^^^^^^
+  File "/Users/jadensmiles/EthicalHoopsIndex/run_season.py", line 287, in pull_game_data
+    hustle = _pull_hustle(game_id)
+  File "/Users/jadensmiles/EthicalHoopsIndex/run_season.py", line 222, in _pull_hustle
+    return _with_retry(_fetch, label="BoxScoreHustleV2")
+  File "/Users/jadensmiles/EthicalHoopsIndex/run_season.py", line 75, in _with_retry
+    result = fn()
+  File "/Users/jadensmiles/EthicalHoopsIndex/run_season.py", line 219, in _fetch
+    return boxscorehustlev2.BoxScoreHustleV2(
+           ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~^
+        game_id=game_id, timeout=60
+        ^^^^^^^^^^^^^^^^^^^^^^^^^^^
+    ).get_data_frames()[0]
+    ^
+  File "/Library/Frameworks/Python.framework/Versions/3.13/lib/python3.13/site-packages/nba_api/stats/endpoints/boxscorehustlev2.py", line 81, in __init__
+    self.get_request()
+    ~~~~~~~~~~~~~~~~^^
+  File "/Library/Frameworks/Python.framework/Versions/3.13/lib/python3.13/site-packages/nba_api/stats/endpoints/boxscorehustlev2.py", line 91, in get_request
+    self.load_response()
+    ~~~~~~~~~~~~~~~~~~^^
+  File "/Library/Frameworks/Python.framework/Versions/3.13/lib/python3.13/site-packages/nba_api/stats/endpoints/boxscorehustlev2.py", line 94, in load_response
+    data_sets = self.nba_response.get_data_sets(self.endpoint)
+  File "/Library/Frameworks/Python.framework/Versions/3.13/lib/python3.13/site-packages/nba_api/stats/library/http.py", line 97, in get_data_sets
+    raw_dict = self.get_dict()
+  File "/Library/Frameworks/Python.framework/Versions/3.13/lib/python3.13/site-packages/nba_api/library/http.py", line 42, in get_dict
+    return json.loads(self._response)
+           ~~~~~~~~~~^^^^^^^^^^^^^^^^
+  File "/Library/Frameworks/Python.framework/Versions/3.13/lib/python3.13/json/__init__.py", line 346, in loads
+    return _default_decoder.decode(s)
+           ~~~~~~~~~~~~~~~~~~~~~~~^^^
+  File "/Library/Frameworks/Python.framework/Versions/3.13/lib/python3.13/json/decoder.py", line 345, in decode
+    obj, end = self.raw_decode(s, idx=_w(s, 0).end())
+               ~~~~~~~~~~~~~~~^^^^^^^^^^^^^^^^^^^^^^^
+  File "/Library/Frameworks/Python.framework/Versions/3.13/lib/python3.13/json/decoder.py", line 363, in raw_decode
+    raise JSONDecodeError("Expecting value", s, err.value) from None
+json.decoder.JSONDecodeError: Expecting value: line 1 column 1 (char 0)
+
+2026-05-16 23:35:33 | game_id=0022500068  matchup=SAC vs PHX  JSONDecodeError: Expecting value: line 1 column 1 (char 0)
+Traceback (most recent call last):
+  File "/Users/jadensmiles/EthicalHoopsIndex/run_season.py", line 331, in run_game
+    data, shots_failed = pull_game_data(game_id)
+                         ~~~~~~~~~~~~~~^^^^^^^^^
+  File "/Users/jadensmiles/EthicalHoopsIndex/run_season.py", line 287, in pull_game_data
+    hustle = _pull_hustle(game_id)
+  File "/Users/jadensmiles/EthicalHoopsIndex/run_season.py", line 222, in _pull_hustle
+    return _with_retry(_fetch, label="BoxScoreHustleV2")
+  File "/Users/jadensmiles/EthicalHoopsIndex/run_season.py", line 75, in _with_retry
+    result = fn()
+  File "/Users/jadensmiles/EthicalHoopsIndex/run_season.py", line 219, in _fetch
+    return boxscorehustlev2.BoxScoreHustleV2(
+           ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~^
+        game_id=game_id, timeout=60
+        ^^^^^^^^^^^^^^^^^^^^^^^^^^^
+    ).get_data_frames()[0]
+    ^
+  File "/Library/Frameworks/Python.framework/Versions/3.13/lib/python3.13/site-packages/nba_api/stats/endpoints/boxscorehustlev2.py", line 81, in __init__
+    self.get_request()
+    ~~~~~~~~~~~~~~~~^^
+  File "/Library/Frameworks/Python.framework/Versions/3.13/lib/python3.13/site-packages/nba_api/stats/endpoints/boxscorehustlev2.py", line 91, in get_request
+    self.load_response()
+    ~~~~~~~~~~~~~~~~~~^^
+  File "/Library/Frameworks/Python.framework/Versions/3.13/lib/python3.13/site-packages/nba_api/stats/endpoints/boxscorehustlev2.py", line 94, in load_response
+    data_sets = self.nba_response.get_data_sets(self.endpoint)
+  File "/Library/Frameworks/Python.framework/Versions/3.13/lib/python3.13/site-packages/nba_api/stats/library/http.py", line 97, in get_data_sets
+    raw_dict = self.get_dict()
+  File "/Library/Frameworks/Python.framework/Versions/3.13/lib/python3.13/site-packages/nba_api/library/http.py", line 42, in get_dict
+    return json.loads(self._response)
+           ~~~~~~~~~~^^^^^^^^^^^^^^^^
+  File "/Library/Frameworks/Python.framework/Versions/3.13/lib/python3.13/json/__init__.py", line 346, in loads
+    return _default_decoder.decode(s)
+           ~~~~~~~~~~~~~~~~~~~~~~~^^^
+  File "/Library/Frameworks/Python.framework/Versions/3.13/lib/python3.13/json/decoder.py", line 345, in decode
+    obj, end = self.raw_decode(s, idx=_w(s, 0).end())
+               ~~~~~~~~~~~~~~~^^^^^^^^^^^^^^^^^^^^^^^
+  File "/Library/Frameworks/Python.framework/Versions/3.13/lib/python3.13/json/decoder.py", line 363, in raw_decode
+    raise JSONDecodeError("Expecting value", s, err.value) from None
+json.decoder.JSONDecodeError: Expecting value: line 1 column 1 (char 0)
+
+2026-05-16 23:36:56 | game_id=0022500061  matchup=CHA vs NYK  JSONDecodeError: Expecting value: line 1 column 1 (char 0)
+Traceback (most recent call last):
+  File "/Users/jadensmiles/EthicalHoopsIndex/run_season.py", line 331, in run_game
+    data, shots_failed = pull_game_data(game_id)
+                         ~~~~~~~~~~~~~~^^^^^^^^^
+  File "/Users/jadensmiles/EthicalHoopsIndex/run_season.py", line 287, in pull_game_data
+    hustle = _pull_hustle(game_id)
+  File "/Users/jadensmiles/EthicalHoopsIndex/run_season.py", line 222, in _pull_hustle
+    return _with_retry(_fetch, label="BoxScoreHustleV2")
+  File "/Users/jadensmiles/EthicalHoopsIndex/run_season.py", line 75, in _with_retry
+    result = fn()
+  File "/Users/jadensmiles/EthicalHoopsIndex/run_season.py", line 219, in _fetch
+    return boxscorehustlev2.BoxScoreHustleV2(
+           ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~^
+        game_id=game_id, timeout=60
+        ^^^^^^^^^^^^^^^^^^^^^^^^^^^
+    ).get_data_frames()[0]
+    ^
+  File "/Library/Frameworks/Python.framework/Versions/3.13/lib/python3.13/site-packages/nba_api/stats/endpoints/boxscorehustlev2.py", line 81, in __init__
+    self.get_request()
+    ~~~~~~~~~~~~~~~~^^
+  File "/Library/Frameworks/Python.framework/Versions/3.13/lib/python3.13/site-packages/nba_api/stats/endpoints/boxscorehustlev2.py", line 91, in get_request
+    self.load_response()
+    ~~~~~~~~~~~~~~~~~~^^
+  File "/Library/Frameworks/Python.framework/Versions/3.13/lib/python3.13/site-packages/nba_api/stats/endpoints/boxscorehustlev2.py", line 94, in load_response
+    data_sets = self.nba_response.get_data_sets(self.endpoint)
+  File "/Library/Frameworks/Python.framework/Versions/3.13/lib/python3.13/site-packages/nba_api/stats/library/http.py", line 97, in get_data_sets
+    raw_dict = self.get_dict()
+  File "/Library/Frameworks/Python.framework/Versions/3.13/lib/python3.13/site-packages/nba_api/library/http.py", line 42, in get_dict
+    return json.loads(self._response)
+           ~~~~~~~~~~^^^^^^^^^^^^^^^^
+  File "/Library/Frameworks/Python.framework/Versions/3.13/lib/python3.13/json/__init__.py", line 346, in loads
+    return _default_decoder.decode(s)
+           ~~~~~~~~~~~~~~~~~~~~~~~^^^
+  File "/Library/Frameworks/Python.framework/Versions/3.13/lib/python3.13/json/decoder.py", line 345, in decode
+    obj, end = self.raw_decode(s, idx=_w(s, 0).end())
+               ~~~~~~~~~~~~~~~^^^^^^^^^^^^^^^^^^^^^^^
+  File "/Library/Frameworks/Python.framework/Versions/3.13/lib/python3.13/json/decoder.py", line 363, in raw_decode
+    raise JSONDecodeError("Expecting value", s, err.value) from None
+json.decoder.JSONDecodeError: Expecting value: line 1 column 1 (char 0)
+
+2026-05-16 23:38:19 | game_id=0022500065  matchup=NOP vs MEM  JSONDecodeError: Expecting value: line 1 column 1 (char 0)
+Traceback (most recent call last):
+  File "/Users/jadensmiles/EthicalHoopsIndex/run_season.py", line 331, in run_game
+    data, shots_failed = pull_game_data(game_id)
+                         ~~~~~~~~~~~~~~^^^^^^^^^
+  File "/Users/jadensmiles/EthicalHoopsIndex/run_season.py", line 287, in pull_game_data
+    hustle = _pull_hustle(game_id)
+  File "/Users/jadensmiles/EthicalHoopsIndex/run_season.py", line 222, in _pull_hustle
+    return _with_retry(_fetch, label="BoxScoreHustleV2")
+  File "/Users/jadensmiles/EthicalHoopsIndex/run_season.py", line 75, in _with_retry
+    result = fn()
+  File "/Users/jadensmiles/EthicalHoopsIndex/run_season.py", line 219, in _fetch
+    return boxscorehustlev2.BoxScoreHustleV2(
+           ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~^
+        game_id=game_id, timeout=60
+        ^^^^^^^^^^^^^^^^^^^^^^^^^^^
+    ).get_data_frames()[0]
+    ^
+  File "/Library/Frameworks/Python.framework/Versions/3.13/lib/python3.13/site-packages/nba_api/stats/endpoints/boxscorehustlev2.py", line 81, in __init__
+    self.get_request()
+    ~~~~~~~~~~~~~~~~^^
+  File "/Library/Frameworks/Python.framework/Versions/3.13/lib/python3.13/site-packages/nba_api/stats/endpoints/boxscorehustlev2.py", line 91, in get_request
+    self.load_response()
+    ~~~~~~~~~~~~~~~~~~^^
+  File "/Library/Frameworks/Python.framework/Versions/3.13/lib/python3.13/site-packages/nba_api/stats/endpoints/boxscorehustlev2.py", line 94, in load_response
+    data_sets = self.nba_response.get_data_sets(self.endpoint)
+  File "/Library/Frameworks/Python.framework/Versions/3.13/lib/python3.13/site-packages/nba_api/stats/library/http.py", line 97, in get_data_sets
+    raw_dict = self.get_dict()
+  File "/Library/Frameworks/Python.framework/Versions/3.13/lib/python3.13/site-packages/nba_api/library/http.py", line 42, in get_dict
+    return json.loads(self._response)
+           ~~~~~~~~~~^^^^^^^^^^^^^^^^
+  File "/Library/Frameworks/Python.framework/Versions/3.13/lib/python3.13/json/__init__.py", line 346, in loads
+    return _default_decoder.decode(s)
+           ~~~~~~~~~~~~~~~~~~~~~~~^^^
+  File "/Library/Frameworks/Python.framework/Versions/3.13/lib/python3.13/json/decoder.py", line 345, in decode
+    obj, end = self.raw_decode(s, idx=_w(s, 0).end())
+               ~~~~~~~~~~~~~~~^^^^^^^^^^^^^^^^^^^^^^^
+  File "/Library/Frameworks/Python.framework/Versions/3.13/lib/python3.13/json/decoder.py", line 363, in raw_decode
+    raise JSONDecodeError("Expecting value", s, err.value) from None
+json.decoder.JSONDecodeError: Expecting value: line 1 column 1 (char 0)
+
+2026-05-16 23:39:41 | game_id=0022500067  matchup=POR vs SAS  JSONDecodeError: Expecting value: line 1 column 1 (char 0)
+Traceback (most recent call last):
+  File "/Users/jadensmiles/EthicalHoopsIndex/run_season.py", line 331, in run_game
+    data, shots_failed = pull_game_data(game_id)
+                         ~~~~~~~~~~~~~~^^^^^^^^^
+  File "/Users/jadensmiles/EthicalHoopsIndex/run_season.py", line 287, in pull_game_data
+    hustle = _pull_hustle(game_id)
+  File "/Users/jadensmiles/EthicalHoopsIndex/run_season.py", line 222, in _pull_hustle
+    return _with_retry(_fetch, label="BoxScoreHustleV2")
+  File "/Users/jadensmiles/EthicalHoopsIndex/run_season.py", line 75, in _with_retry
+    result = fn()
+  File "/Users/jadensmiles/EthicalHoopsIndex/run_season.py", line 219, in _fetch
+    return boxscorehustlev2.BoxScoreHustleV2(
+           ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~^
+        game_id=game_id, timeout=60
+        ^^^^^^^^^^^^^^^^^^^^^^^^^^^
+    ).get_data_frames()[0]
+    ^
+  File "/Library/Frameworks/Python.framework/Versions/3.13/lib/python3.13/site-packages/nba_api/stats/endpoints/boxscorehustlev2.py", line 81, in __init__
+    self.get_request()
+    ~~~~~~~~~~~~~~~~^^
+  File "/Library/Frameworks/Python.framework/Versions/3.13/lib/python3.13/site-packages/nba_api/stats/endpoints/boxscorehustlev2.py", line 91, in get_request
+    self.load_response()
+    ~~~~~~~~~~~~~~~~~~^^
+  File "/Library/Frameworks/Python.framework/Versions/3.13/lib/python3.13/site-packages/nba_api/stats/endpoints/boxscorehustlev2.py", line 94, in load_response
+    data_sets = self.nba_response.get_data_sets(self.endpoint)
+  File "/Library/Frameworks/Python.framework/Versions/3.13/lib/python3.13/site-packages/nba_api/stats/library/http.py", line 97, in get_data_sets
+    raw_dict = self.get_dict()
+  File "/Library/Frameworks/Python.framework/Versions/3.13/lib/python3.13/site-packages/nba_api/library/http.py", line 42, in get_dict
+    return json.loads(self._response)
+           ~~~~~~~~~~^^^^^^^^^^^^^^^^
+  File "/Library/Frameworks/Python.framework/Versions/3.13/lib/python3.13/json/__init__.py", line 346, in loads
+    return _default_decoder.decode(s)
+           ~~~~~~~~~~~~~~~~~~~~~~~^^^
+  File "/Library/Frameworks/Python.framework/Versions/3.13/lib/python3.13/json/decoder.py", line 345, in decode
+    obj, end = self.raw_decode(s, idx=_w(s, 0).end())
+               ~~~~~~~~~~~~~~~^^^^^^^^^^^^^^^^^^^^^^^
+  File "/Library/Frameworks/Python.framework/Versions/3.13/lib/python3.13/json/decoder.py", line 363, in raw_decode
+    raise JSONDecodeError("Expecting value", s, err.value) from None
+json.decoder.JSONDecodeError: Expecting value: line 1 column 1 (char 0)
+
+2026-05-16 23:41:42 | game_id=0022500062  matchup=MIA vs MIL  JSONDecodeError: Expecting value: line 1 column 1 (char 0)
+Traceback (most recent call last):
+  File "/Users/jadensmiles/EthicalHoopsIndex/run_season.py", line 331, in run_game
+    data, shots_failed = pull_game_data(game_id)
+                         ~~~~~~~~~~~~~~^^^^^^^^^
+  File "/Users/jadensmiles/EthicalHoopsIndex/run_season.py", line 287, in pull_game_data
+    hustle = _pull_hustle(game_id)
+  File "/Users/jadensmiles/EthicalHoopsIndex/run_season.py", line 222, in _pull_hustle
+    return _with_retry(_fetch, label="BoxScoreHustleV2")
+  File "/Users/jadensmiles/EthicalHoopsIndex/run_season.py", line 75, in _with_retry
+    result = fn()
+  File "/Users/jadensmiles/EthicalHoopsIndex/run_season.py", line 219, in _fetch
+    return boxscorehustlev2.BoxScoreHustleV2(
+           ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~^
+        game_id=game_id, timeout=60
+        ^^^^^^^^^^^^^^^^^^^^^^^^^^^
+    ).get_data_frames()[0]
+    ^
+  File "/Library/Frameworks/Python.framework/Versions/3.13/lib/python3.13/site-packages/nba_api/stats/endpoints/boxscorehustlev2.py", line 81, in __init__
+    self.get_request()
+    ~~~~~~~~~~~~~~~~^^
+  File "/Library/Frameworks/Python.framework/Versions/3.13/lib/python3.13/site-packages/nba_api/stats/endpoints/boxscorehustlev2.py", line 91, in get_request
+    self.load_response()
+    ~~~~~~~~~~~~~~~~~~^^
+  File "/Library/Frameworks/Python.framework/Versions/3.13/lib/python3.13/site-packages/nba_api/stats/endpoints/boxscorehustlev2.py", line 94, in load_response
+    data_sets = self.nba_response.get_data_sets(self.endpoint)
+  File "/Library/Frameworks/Python.framework/Versions/3.13/lib/python3.13/site-packages/nba_api/stats/library/http.py", line 97, in get_data_sets
+    raw_dict = self.get_dict()
+  File "/Library/Frameworks/Python.framework/Versions/3.13/lib/python3.13/site-packages/nba_api/library/http.py", line 42, in get_dict
+    return json.loads(self._response)
+           ~~~~~~~~~~^^^^^^^^^^^^^^^^
+  File "/Library/Frameworks/Python.framework/Versions/3.13/lib/python3.13/json/__init__.py", line 346, in loads
+    return _default_decoder.decode(s)
+           ~~~~~~~~~~~~~~~~~~~~~~~^^^
+  File "/Library/Frameworks/Python.framework/Versions/3.13/lib/python3.13/json/decoder.py", line 345, in decode
+    obj, end = self.raw_decode(s, idx=_w(s, 0).end())
+               ~~~~~~~~~~~~~~~^^^^^^^^^^^^^^^^^^^^^^^
+  File "/Library/Frameworks/Python.framework/Versions/3.13/lib/python3.13/json/decoder.py", line 363, in raw_decode
+    raise JSONDecodeError("Expecting value", s, err.value) from None
+json.decoder.JSONDecodeError: Expecting value: line 1 column 1 (char 0)
+
+2026-05-17 00:02:23 | game_id=0022500321  matchup=NOP vs MIN  JSONDecodeError: Expecting value: line 1 column 1 (char 0)
+Traceback (most recent call last):
+  File "/Users/jadensmiles/EthicalHoopsIndex/run_season.py", line 331, in run_game
+    data, shots_failed = pull_game_data(game_id)
+                         ~~~~~~~~~~~~~~^^^^^^^^^
+  File "/Users/jadensmiles/EthicalHoopsIndex/run_season.py", line 287, in pull_game_data
+    hustle = _pull_hustle(game_id)
+  File "/Users/jadensmiles/EthicalHoopsIndex/run_season.py", line 222, in _pull_hustle
+    return _with_retry(_fetch, label="BoxScoreHustleV2")
+  File "/Users/jadensmiles/EthicalHoopsIndex/run_season.py", line 75, in _with_retry
+    result = fn()
+  File "/Users/jadensmiles/EthicalHoopsIndex/run_season.py", line 219, in _fetch
+    return boxscorehustlev2.BoxScoreHustleV2(
+           ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~^
+        game_id=game_id, timeout=60
+        ^^^^^^^^^^^^^^^^^^^^^^^^^^^
+    ).get_data_frames()[0]
+    ^
+  File "/Library/Frameworks/Python.framework/Versions/3.13/lib/python3.13/site-packages/nba_api/stats/endpoints/boxscorehustlev2.py", line 81, in __init__
+    self.get_request()
+    ~~~~~~~~~~~~~~~~^^
+  File "/Library/Frameworks/Python.framework/Versions/3.13/lib/python3.13/site-packages/nba_api/stats/endpoints/boxscorehustlev2.py", line 91, in get_request
+    self.load_response()
+    ~~~~~~~~~~~~~~~~~~^^
+  File "/Library/Frameworks/Python.framework/Versions/3.13/lib/python3.13/site-packages/nba_api/stats/endpoints/boxscorehustlev2.py", line 94, in load_response
+    data_sets = self.nba_response.get_data_sets(self.endpoint)
+  File "/Library/Frameworks/Python.framework/Versions/3.13/lib/python3.13/site-packages/nba_api/stats/library/http.py", line 97, in get_data_sets
+    raw_dict = self.get_dict()
+  File "/Library/Frameworks/Python.framework/Versions/3.13/lib/python3.13/site-packages/nba_api/library/http.py", line 42, in get_dict
+    return json.loads(self._response)
+           ~~~~~~~~~~^^^^^^^^^^^^^^^^
+  File "/Library/Frameworks/Python.framework/Versions/3.13/lib/python3.13/json/__init__.py", line 346, in loads
+    return _default_decoder.decode(s)
+           ~~~~~~~~~~~~~~~~~~~~~~~^^^
+  File "/Library/Frameworks/Python.framework/Versions/3.13/lib/python3.13/json/decoder.py", line 345, in decode
+    obj, end = self.raw_decode(s, idx=_w(s, 0).end())
+               ~~~~~~~~~~~~~~~^^^^^^^^^^^^^^^^^^^^^^^
+  File "/Library/Frameworks/Python.framework/Versions/3.13/lib/python3.13/json/decoder.py", line 363, in raw_decode
+    raise JSONDecodeError("Expecting value", s, err.value) from None
+json.decoder.JSONDecodeError: Expecting value: line 1 column 1 (char 0)
+
+2026-05-17 00:03:46 | game_id=0022500319  matchup=TOR vs POR  JSONDecodeError: Expecting value: line 1 column 1 (char 0)
+Traceback (most recent call last):
+  File "/Users/jadensmiles/EthicalHoopsIndex/run_season.py", line 331, in run_game
+    data, shots_failed = pull_game_data(game_id)
+                         ~~~~~~~~~~~~~~^^^^^^^^^
+  File "/Users/jadensmiles/EthicalHoopsIndex/run_season.py", line 287, in pull_game_data
+    hustle = _pull_hustle(game_id)
+  File "/Users/jadensmiles/EthicalHoopsIndex/run_season.py", line 222, in _pull_hustle
+    return _with_retry(_fetch, label="BoxScoreHustleV2")
+  File "/Users/jadensmiles/EthicalHoopsIndex/run_season.py", line 75, in _with_retry
+    result = fn()
+  File "/Users/jadensmiles/EthicalHoopsIndex/run_season.py", line 219, in _fetch
+    return boxscorehustlev2.BoxScoreHustleV2(
+           ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~^
+        game_id=game_id, timeout=60
+        ^^^^^^^^^^^^^^^^^^^^^^^^^^^
+    ).get_data_frames()[0]
+    ^
+  File "/Library/Frameworks/Python.framework/Versions/3.13/lib/python3.13/site-packages/nba_api/stats/endpoints/boxscorehustlev2.py", line 81, in __init__
+    self.get_request()
+    ~~~~~~~~~~~~~~~~^^
+  File "/Library/Frameworks/Python.framework/Versions/3.13/lib/python3.13/site-packages/nba_api/stats/endpoints/boxscorehustlev2.py", line 91, in get_request
+    self.load_response()
+    ~~~~~~~~~~~~~~~~~~^^
+  File "/Library/Frameworks/Python.framework/Versions/3.13/lib/python3.13/site-packages/nba_api/stats/endpoints/boxscorehustlev2.py", line 94, in load_response
+    data_sets = self.nba_response.get_data_sets(self.endpoint)
+  File "/Library/Frameworks/Python.framework/Versions/3.13/lib/python3.13/site-packages/nba_api/stats/library/http.py", line 97, in get_data_sets
+    raw_dict = self.get_dict()
+  File "/Library/Frameworks/Python.framework/Versions/3.13/lib/python3.13/site-packages/nba_api/library/http.py", line 42, in get_dict
+    return json.loads(self._response)
+           ~~~~~~~~~~^^^^^^^^^^^^^^^^
+  File "/Library/Frameworks/Python.framework/Versions/3.13/lib/python3.13/json/__init__.py", line 346, in loads
+    return _default_decoder.decode(s)
+           ~~~~~~~~~~~~~~~~~~~~~~~^^^
+  File "/Library/Frameworks/Python.framework/Versions/3.13/lib/python3.13/json/decoder.py", line 345, in decode
+    obj, end = self.raw_decode(s, idx=_w(s, 0).end())
+               ~~~~~~~~~~~~~~~^^^^^^^^^^^^^^^^^^^^^^^
+  File "/Library/Frameworks/Python.framework/Versions/3.13/lib/python3.13/json/decoder.py", line 363, in raw_decode
+    raise JSONDecodeError("Expecting value", s, err.value) from None
+json.decoder.JSONDecodeError: Expecting value: line 1 column 1 (char 0)
+
+2026-05-17 00:05:09 | game_id=0022500325  matchup=IND vs DEN  JSONDecodeError: Expecting value: line 1 column 1 (char 0)
+Traceback (most recent call last):
+  File "/Users/jadensmiles/EthicalHoopsIndex/run_season.py", line 331, in run_game
+    data, shots_failed = pull_game_data(game_id)
+                         ~~~~~~~~~~~~~~^^^^^^^^^
+  File "/Users/jadensmiles/EthicalHoopsIndex/run_season.py", line 287, in pull_game_data
+    hustle = _pull_hustle(game_id)
+  File "/Users/jadensmiles/EthicalHoopsIndex/run_season.py", line 222, in _pull_hustle
+    return _with_retry(_fetch, label="BoxScoreHustleV2")
+  File "/Users/jadensmiles/EthicalHoopsIndex/run_season.py", line 75, in _with_retry
+    result = fn()
+  File "/Users/jadensmiles/EthicalHoopsIndex/run_season.py", line 219, in _fetch
+    return boxscorehustlev2.BoxScoreHustleV2(
+           ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~^
+        game_id=game_id, timeout=60
+        ^^^^^^^^^^^^^^^^^^^^^^^^^^^
+    ).get_data_frames()[0]
+    ^
+  File "/Library/Frameworks/Python.framework/Versions/3.13/lib/python3.13/site-packages/nba_api/stats/endpoints/boxscorehustlev2.py", line 81, in __init__
+    self.get_request()
+    ~~~~~~~~~~~~~~~~^^
+  File "/Library/Frameworks/Python.framework/Versions/3.13/lib/python3.13/site-packages/nba_api/stats/endpoints/boxscorehustlev2.py", line 91, in get_request
+    self.load_response()
+    ~~~~~~~~~~~~~~~~~~^^
+  File "/Library/Frameworks/Python.framework/Versions/3.13/lib/python3.13/site-packages/nba_api/stats/endpoints/boxscorehustlev2.py", line 94, in load_response
+    data_sets = self.nba_response.get_data_sets(self.endpoint)
+  File "/Library/Frameworks/Python.framework/Versions/3.13/lib/python3.13/site-packages/nba_api/stats/library/http.py", line 97, in get_data_sets
+    raw_dict = self.get_dict()
+  File "/Library/Frameworks/Python.framework/Versions/3.13/lib/python3.13/site-packages/nba_api/library/http.py", line 42, in get_dict
+    return json.loads(self._response)
+           ~~~~~~~~~~^^^^^^^^^^^^^^^^
+  File "/Library/Frameworks/Python.framework/Versions/3.13/lib/python3.13/json/__init__.py", line 346, in loads
+    return _default_decoder.decode(s)
+           ~~~~~~~~~~~~~~~~~~~~~~~^^^
+  File "/Library/Frameworks/Python.framework/Versions/3.13/lib/python3.13/json/decoder.py", line 345, in decode
+    obj, end = self.raw_decode(s, idx=_w(s, 0).end())
+               ~~~~~~~~~~~~~~~^^^^^^^^^^^^^^^^^^^^^^^
+  File "/Library/Frameworks/Python.framework/Versions/3.13/lib/python3.13/json/decoder.py", line 363, in raw_decode
+    raise JSONDecodeError("Expecting value", s, err.value) from None
+json.decoder.JSONDecodeError: Expecting value: line 1 column 1 (char 0)
+
+2026-05-17 00:06:31 | game_id=0022500327  matchup=ATL vs LAC  JSONDecodeError: Expecting value: line 1 column 1 (char 0)
+Traceback (most recent call last):
+  File "/Users/jadensmiles/EthicalHoopsIndex/run_season.py", line 331, in run_game
+    data, shots_failed = pull_game_data(game_id)
+                         ~~~~~~~~~~~~~~^^^^^^^^^
+  File "/Users/jadensmiles/EthicalHoopsIndex/run_season.py", line 287, in pull_game_data
+    hustle = _pull_hustle(game_id)
+  File "/Users/jadensmiles/EthicalHoopsIndex/run_season.py", line 222, in _pull_hustle
+    return _with_retry(_fetch, label="BoxScoreHustleV2")
+  File "/Users/jadensmiles/EthicalHoopsIndex/run_season.py", line 75, in _with_retry
+    result = fn()
+  File "/Users/jadensmiles/EthicalHoopsIndex/run_season.py", line 219, in _fetch
+    return boxscorehustlev2.BoxScoreHustleV2(
+           ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~^
+        game_id=game_id, timeout=60
+        ^^^^^^^^^^^^^^^^^^^^^^^^^^^
+    ).get_data_frames()[0]
+    ^
+  File "/Library/Frameworks/Python.framework/Versions/3.13/lib/python3.13/site-packages/nba_api/stats/endpoints/boxscorehustlev2.py", line 81, in __init__
+    self.get_request()
+    ~~~~~~~~~~~~~~~~^^
+  File "/Library/Frameworks/Python.framework/Versions/3.13/lib/python3.13/site-packages/nba_api/stats/endpoints/boxscorehustlev2.py", line 91, in get_request
+    self.load_response()
+    ~~~~~~~~~~~~~~~~~~^^
+  File "/Library/Frameworks/Python.framework/Versions/3.13/lib/python3.13/site-packages/nba_api/stats/endpoints/boxscorehustlev2.py", line 94, in load_response
+    data_sets = self.nba_response.get_data_sets(self.endpoint)
+  File "/Library/Frameworks/Python.framework/Versions/3.13/lib/python3.13/site-packages/nba_api/stats/library/http.py", line 97, in get_data_sets
+    raw_dict = self.get_dict()
+  File "/Library/Frameworks/Python.framework/Versions/3.13/lib/python3.13/site-packages/nba_api/library/http.py", line 42, in get_dict
+    return json.loads(self._response)
+           ~~~~~~~~~~^^^^^^^^^^^^^^^^
+  File "/Library/Frameworks/Python.framework/Versions/3.13/lib/python3.13/json/__init__.py", line 346, in loads
+    return _default_decoder.decode(s)
+           ~~~~~~~~~~~~~~~~~~~~~~~^^^
+  File "/Library/Frameworks/Python.framework/Versions/3.13/lib/python3.13/json/decoder.py", line 345, in decode
+    obj, end = self.raw_decode(s, idx=_w(s, 0).end())
+               ~~~~~~~~~~~~~~~^^^^^^^^^^^^^^^^^^^^^^^
+  File "/Library/Frameworks/Python.framework/Versions/3.13/lib/python3.13/json/decoder.py", line 363, in raw_decode
+    raise JSONDecodeError("Expecting value", s, err.value) from None
+json.decoder.JSONDecodeError: Expecting value: line 1 column 1 (char 0)
+
+2026-05-17 00:07:54 | game_id=0022500331  matchup=MIL vs DET  JSONDecodeError: Expecting value: line 1 column 1 (char 0)
+Traceback (most recent call last):
+  File "/Users/jadensmiles/EthicalHoopsIndex/run_season.py", line 331, in run_game
+    data, shots_failed = pull_game_data(game_id)
+                         ~~~~~~~~~~~~~~^^^^^^^^^
+  File "/Users/jadensmiles/EthicalHoopsIndex/run_season.py", line 287, in pull_game_data
+    hustle = _pull_hustle(game_id)
+  File "/Users/jadensmiles/EthicalHoopsIndex/run_season.py", line 222, in _pull_hustle
+    return _with_retry(_fetch, label="BoxScoreHustleV2")
+  File "/Users/jadensmiles/EthicalHoopsIndex/run_season.py", line 75, in _with_retry
+    result = fn()
+  File "/Users/jadensmiles/EthicalHoopsIndex/run_season.py", line 219, in _fetch
+    return boxscorehustlev2.BoxScoreHustleV2(
+           ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~^
+        game_id=game_id, timeout=60
+        ^^^^^^^^^^^^^^^^^^^^^^^^^^^
+    ).get_data_frames()[0]
+    ^
+  File "/Library/Frameworks/Python.framework/Versions/3.13/lib/python3.13/site-packages/nba_api/stats/endpoints/boxscorehustlev2.py", line 81, in __init__
+    self.get_request()
+    ~~~~~~~~~~~~~~~~^^
+  File "/Library/Frameworks/Python.framework/Versions/3.13/lib/python3.13/site-packages/nba_api/stats/endpoints/boxscorehustlev2.py", line 91, in get_request
+    self.load_response()
+    ~~~~~~~~~~~~~~~~~~^^
+  File "/Library/Frameworks/Python.framework/Versions/3.13/lib/python3.13/site-packages/nba_api/stats/endpoints/boxscorehustlev2.py", line 94, in load_response
+    data_sets = self.nba_response.get_data_sets(self.endpoint)
+  File "/Library/Frameworks/Python.framework/Versions/3.13/lib/python3.13/site-packages/nba_api/stats/library/http.py", line 97, in get_data_sets
+    raw_dict = self.get_dict()
+  File "/Library/Frameworks/Python.framework/Versions/3.13/lib/python3.13/site-packages/nba_api/library/http.py", line 42, in get_dict
+    return json.loads(self._response)
+           ~~~~~~~~~~^^^^^^^^^^^^^^^^
+  File "/Library/Frameworks/Python.framework/Versions/3.13/lib/python3.13/json/__init__.py", line 346, in loads
+    return _default_decoder.decode(s)
+           ~~~~~~~~~~~~~~~~~~~~~~~^^^
+  File "/Library/Frameworks/Python.framework/Versions/3.13/lib/python3.13/json/decoder.py", line 345, in decode
+    obj, end = self.raw_decode(s, idx=_w(s, 0).end())
+               ~~~~~~~~~~~~~~~^^^^^^^^^^^^^^^^^^^^^^^
+  File "/Library/Frameworks/Python.framework/Versions/3.13/lib/python3.13/json/decoder.py", line 363, in raw_decode
+    raise JSONDecodeError("Expecting value", s, err.value) from None
+json.decoder.JSONDecodeError: Expecting value: line 1 column 1 (char 0)
+
+2026-05-17 00:09:17 | game_id=0022500329  matchup=CHI vs BKN  JSONDecodeError: Expecting value: line 1 column 1 (char 0)
+Traceback (most recent call last):
+  File "/Users/jadensmiles/EthicalHoopsIndex/run_season.py", line 331, in run_game
+    data, shots_failed = pull_game_data(game_id)
+                         ~~~~~~~~~~~~~~^^^^^^^^^
+  File "/Users/jadensmiles/EthicalHoopsIndex/run_season.py", line 287, in pull_game_data
+    hustle = _pull_hustle(game_id)
+  File "/Users/jadensmiles/EthicalHoopsIndex/run_season.py", line 222, in _pull_hustle
+    return _with_retry(_fetch, label="BoxScoreHustleV2")
+  File "/Users/jadensmiles/EthicalHoopsIndex/run_season.py", line 75, in _with_retry
+    result = fn()
+  File "/Users/jadensmiles/EthicalHoopsIndex/run_season.py", line 219, in _fetch
+    return boxscorehustlev2.BoxScoreHustleV2(
+           ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~^
+        game_id=game_id, timeout=60
+        ^^^^^^^^^^^^^^^^^^^^^^^^^^^
+    ).get_data_frames()[0]
+    ^
+  File "/Library/Frameworks/Python.framework/Versions/3.13/lib/python3.13/site-packages/nba_api/stats/endpoints/boxscorehustlev2.py", line 81, in __init__
+    self.get_request()
+    ~~~~~~~~~~~~~~~~^^
+  File "/Library/Frameworks/Python.framework/Versions/3.13/lib/python3.13/site-packages/nba_api/stats/endpoints/boxscorehustlev2.py", line 91, in get_request
+    self.load_response()
+    ~~~~~~~~~~~~~~~~~~^^
+  File "/Library/Frameworks/Python.framework/Versions/3.13/lib/python3.13/site-packages/nba_api/stats/endpoints/boxscorehustlev2.py", line 94, in load_response
+    data_sets = self.nba_response.get_data_sets(self.endpoint)
+  File "/Library/Frameworks/Python.framework/Versions/3.13/lib/python3.13/site-packages/nba_api/stats/library/http.py", line 97, in get_data_sets
+    raw_dict = self.get_dict()
+  File "/Library/Frameworks/Python.framework/Versions/3.13/lib/python3.13/site-packages/nba_api/library/http.py", line 42, in get_dict
+    return json.loads(self._response)
+           ~~~~~~~~~~^^^^^^^^^^^^^^^^
+  File "/Library/Frameworks/Python.framework/Versions/3.13/lib/python3.13/json/__init__.py", line 346, in loads
+    return _default_decoder.decode(s)
+           ~~~~~~~~~~~~~~~~~~~~~~~^^^
+  File "/Library/Frameworks/Python.framework/Versions/3.13/lib/python3.13/json/decoder.py", line 345, in decode
+    obj, end = self.raw_decode(s, idx=_w(s, 0).end())
+               ~~~~~~~~~~~~~~~^^^^^^^^^^^^^^^^^^^^^^^
+  File "/Library/Frameworks/Python.framework/Versions/3.13/lib/python3.13/json/decoder.py", line 363, in raw_decode
+    raise JSONDecodeError("Expecting value", s, err.value) from None
+json.decoder.JSONDecodeError: Expecting value: line 1 column 1 (char 0)
+
+2026-05-17 00:10:39 | game_id=0022500324  matchup=CLE vs POR  JSONDecodeError: Expecting value: line 1 column 1 (char 0)
+Traceback (most recent call last):
+  File "/Users/jadensmiles/EthicalHoopsIndex/run_season.py", line 331, in run_game
+    data, shots_failed = pull_game_data(game_id)
+                         ~~~~~~~~~~~~~~^^^^^^^^^
+  File "/Users/jadensmiles/EthicalHoopsIndex/run_season.py", line 287, in pull_game_data
+    hustle = _pull_hustle(game_id)
+  File "/Users/jadensmiles/EthicalHoopsIndex/run_season.py", line 222, in _pull_hustle
+    return _with_retry(_fetch, label="BoxScoreHustleV2")
+  File "/Users/jadensmiles/EthicalHoopsIndex/run_season.py", line 75, in _with_retry
+    result = fn()
+  File "/Users/jadensmiles/EthicalHoopsIndex/run_season.py", line 219, in _fetch
+    return boxscorehustlev2.BoxScoreHustleV2(
+           ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~^
+        game_id=game_id, timeout=60
+        ^^^^^^^^^^^^^^^^^^^^^^^^^^^
+    ).get_data_frames()[0]
+    ^
+  File "/Library/Frameworks/Python.framework/Versions/3.13/lib/python3.13/site-packages/nba_api/stats/endpoints/boxscorehustlev2.py", line 81, in __init__
+    self.get_request()
+    ~~~~~~~~~~~~~~~~^^
+  File "/Library/Frameworks/Python.framework/Versions/3.13/lib/python3.13/site-packages/nba_api/stats/endpoints/boxscorehustlev2.py", line 91, in get_request
+    self.load_response()
+    ~~~~~~~~~~~~~~~~~~^^
+  File "/Library/Frameworks/Python.framework/Versions/3.13/lib/python3.13/site-packages/nba_api/stats/endpoints/boxscorehustlev2.py", line 94, in load_response
+    data_sets = self.nba_response.get_data_sets(self.endpoint)
+  File "/Library/Frameworks/Python.framework/Versions/3.13/lib/python3.13/site-packages/nba_api/stats/library/http.py", line 97, in get_data_sets
+    raw_dict = self.get_dict()
+  File "/Library/Frameworks/Python.framework/Versions/3.13/lib/python3.13/site-packages/nba_api/library/http.py", line 42, in get_dict
+    return json.loads(self._response)
+           ~~~~~~~~~~^^^^^^^^^^^^^^^^
+  File "/Library/Frameworks/Python.framework/Versions/3.13/lib/python3.13/json/__init__.py", line 346, in loads
+    return _default_decoder.decode(s)
+           ~~~~~~~~~~~~~~~~~~~~~~~^^^
+  File "/Library/Frameworks/Python.framework/Versions/3.13/lib/python3.13/json/decoder.py", line 345, in decode
+    obj, end = self.raw_decode(s, idx=_w(s, 0).end())
+               ~~~~~~~~~~~~~~~^^^^^^^^^^^^^^^^^^^^^^^
+  File "/Library/Frameworks/Python.framework/Versions/3.13/lib/python3.13/json/decoder.py", line 363, in raw_decode
+    raise JSONDecodeError("Expecting value", s, err.value) from None
+json.decoder.JSONDecodeError: Expecting value: line 1 column 1 (char 0)
+
+2026-05-17 01:01:54 | game_id=0022500415  matchup=DAL vs DEN  JSONDecodeError: Expecting value: line 1 column 1 (char 0)
+Traceback (most recent call last):
+  File "/Users/jadensmiles/EthicalHoopsIndex/run_season.py", line 331, in run_game
+    data, shots_failed = pull_game_data(game_id)
+                         ~~~~~~~~~~~~~~^^^^^^^^^
+  File "/Users/jadensmiles/EthicalHoopsIndex/run_season.py", line 287, in pull_game_data
+    hustle = _pull_hustle(game_id)
+  File "/Users/jadensmiles/EthicalHoopsIndex/run_season.py", line 222, in _pull_hustle
+    return _with_retry(_fetch, label="BoxScoreHustleV2")
+  File "/Users/jadensmiles/EthicalHoopsIndex/run_season.py", line 75, in _with_retry
+    result = fn()
+  File "/Users/jadensmiles/EthicalHoopsIndex/run_season.py", line 219, in _fetch
+    return boxscorehustlev2.BoxScoreHustleV2(
+           ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~^
+        game_id=game_id, timeout=60
+        ^^^^^^^^^^^^^^^^^^^^^^^^^^^
+    ).get_data_frames()[0]
+    ^
+  File "/Library/Frameworks/Python.framework/Versions/3.13/lib/python3.13/site-packages/nba_api/stats/endpoints/boxscorehustlev2.py", line 81, in __init__
+    self.get_request()
+    ~~~~~~~~~~~~~~~~^^
+  File "/Library/Frameworks/Python.framework/Versions/3.13/lib/python3.13/site-packages/nba_api/stats/endpoints/boxscorehustlev2.py", line 91, in get_request
+    self.load_response()
+    ~~~~~~~~~~~~~~~~~~^^
+  File "/Library/Frameworks/Python.framework/Versions/3.13/lib/python3.13/site-packages/nba_api/stats/endpoints/boxscorehustlev2.py", line 94, in load_response
+    data_sets = self.nba_response.get_data_sets(self.endpoint)
+  File "/Library/Frameworks/Python.framework/Versions/3.13/lib/python3.13/site-packages/nba_api/stats/library/http.py", line 97, in get_data_sets
+    raw_dict = self.get_dict()
+  File "/Library/Frameworks/Python.framework/Versions/3.13/lib/python3.13/site-packages/nba_api/library/http.py", line 42, in get_dict
+    return json.loads(self._response)
+           ~~~~~~~~~~^^^^^^^^^^^^^^^^
+  File "/Library/Frameworks/Python.framework/Versions/3.13/lib/python3.13/json/__init__.py", line 346, in loads
+    return _default_decoder.decode(s)
+           ~~~~~~~~~~~~~~~~~~~~~~~^^^
+  File "/Library/Frameworks/Python.framework/Versions/3.13/lib/python3.13/json/decoder.py", line 345, in decode
+    obj, end = self.raw_decode(s, idx=_w(s, 0).end())
+               ~~~~~~~~~~~~~~~^^^^^^^^^^^^^^^^^^^^^^^
+  File "/Library/Frameworks/Python.framework/Versions/3.13/lib/python3.13/json/decoder.py", line 363, in raw_decode
+    raise JSONDecodeError("Expecting value", s, err.value) from None
+json.decoder.JSONDecodeError: Expecting value: line 1 column 1 (char 0)
+
+2026-05-17 01:03:17 | game_id=0022500421  matchup=SAC vs DET  JSONDecodeError: Expecting value: line 1 column 1 (char 0)
+Traceback (most recent call last):
+  File "/Users/jadensmiles/EthicalHoopsIndex/run_season.py", line 331, in run_game
+    data, shots_failed = pull_game_data(game_id)
+                         ~~~~~~~~~~~~~~^^^^^^^^^
+  File "/Users/jadensmiles/EthicalHoopsIndex/run_season.py", line 287, in pull_game_data
+    hustle = _pull_hustle(game_id)
+  File "/Users/jadensmiles/EthicalHoopsIndex/run_season.py", line 222, in _pull_hustle
+    return _with_retry(_fetch, label="BoxScoreHustleV2")
+  File "/Users/jadensmiles/EthicalHoopsIndex/run_season.py", line 75, in _with_retry
+    result = fn()
+  File "/Users/jadensmiles/EthicalHoopsIndex/run_season.py", line 219, in _fetch
+    return boxscorehustlev2.BoxScoreHustleV2(
+           ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~^
+        game_id=game_id, timeout=60
+        ^^^^^^^^^^^^^^^^^^^^^^^^^^^
+    ).get_data_frames()[0]
+    ^
+  File "/Library/Frameworks/Python.framework/Versions/3.13/lib/python3.13/site-packages/nba_api/stats/endpoints/boxscorehustlev2.py", line 81, in __init__
+    self.get_request()
+    ~~~~~~~~~~~~~~~~^^
+  File "/Library/Frameworks/Python.framework/Versions/3.13/lib/python3.13/site-packages/nba_api/stats/endpoints/boxscorehustlev2.py", line 91, in get_request
+    self.load_response()
+    ~~~~~~~~~~~~~~~~~~^^
+  File "/Library/Frameworks/Python.framework/Versions/3.13/lib/python3.13/site-packages/nba_api/stats/endpoints/boxscorehustlev2.py", line 94, in load_response
+    data_sets = self.nba_response.get_data_sets(self.endpoint)
+  File "/Library/Frameworks/Python.framework/Versions/3.13/lib/python3.13/site-packages/nba_api/stats/library/http.py", line 97, in get_data_sets
+    raw_dict = self.get_dict()
+  File "/Library/Frameworks/Python.framework/Versions/3.13/lib/python3.13/site-packages/nba_api/library/http.py", line 42, in get_dict
+    return json.loads(self._response)
+           ~~~~~~~~~~^^^^^^^^^^^^^^^^
+  File "/Library/Frameworks/Python.framework/Versions/3.13/lib/python3.13/json/__init__.py", line 346, in loads
+    return _default_decoder.decode(s)
+           ~~~~~~~~~~~~~~~~~~~~~~~^^^
+  File "/Library/Frameworks/Python.framework/Versions/3.13/lib/python3.13/json/decoder.py", line 345, in decode
+    obj, end = self.raw_decode(s, idx=_w(s, 0).end())
+               ~~~~~~~~~~~~~~~^^^^^^^^^^^^^^^^^^^^^^^
+  File "/Library/Frameworks/Python.framework/Versions/3.13/lib/python3.13/json/decoder.py", line 363, in raw_decode
+    raise JSONDecodeError("Expecting value", s, err.value) from None
+json.decoder.JSONDecodeError: Expecting value: line 1 column 1 (char 0)
+
+2026-05-17 01:04:39 | game_id=0022500417  matchup=SAS vs OKC  JSONDecodeError: Expecting value: line 1 column 1 (char 0)
+Traceback (most recent call last):
+  File "/Users/jadensmiles/EthicalHoopsIndex/run_season.py", line 331, in run_game
+    data, shots_failed = pull_game_data(game_id)
+                         ~~~~~~~~~~~~~~^^^^^^^^^
+  File "/Users/jadensmiles/EthicalHoopsIndex/run_season.py", line 287, in pull_game_data
+    hustle = _pull_hustle(game_id)
+  File "/Users/jadensmiles/EthicalHoopsIndex/run_season.py", line 222, in _pull_hustle
+    return _with_retry(_fetch, label="BoxScoreHustleV2")
+  File "/Users/jadensmiles/EthicalHoopsIndex/run_season.py", line 75, in _with_retry
+    result = fn()
+  File "/Users/jadensmiles/EthicalHoopsIndex/run_season.py", line 219, in _fetch
+    return boxscorehustlev2.BoxScoreHustleV2(
+           ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~^
+        game_id=game_id, timeout=60
+        ^^^^^^^^^^^^^^^^^^^^^^^^^^^
+    ).get_data_frames()[0]
+    ^
+  File "/Library/Frameworks/Python.framework/Versions/3.13/lib/python3.13/site-packages/nba_api/stats/endpoints/boxscorehustlev2.py", line 81, in __init__
+    self.get_request()
+    ~~~~~~~~~~~~~~~~^^
+  File "/Library/Frameworks/Python.framework/Versions/3.13/lib/python3.13/site-packages/nba_api/stats/endpoints/boxscorehustlev2.py", line 91, in get_request
+    self.load_response()
+    ~~~~~~~~~~~~~~~~~~^^
+  File "/Library/Frameworks/Python.framework/Versions/3.13/lib/python3.13/site-packages/nba_api/stats/endpoints/boxscorehustlev2.py", line 94, in load_response
+    data_sets = self.nba_response.get_data_sets(self.endpoint)
+  File "/Library/Frameworks/Python.framework/Versions/3.13/lib/python3.13/site-packages/nba_api/stats/library/http.py", line 97, in get_data_sets
+    raw_dict = self.get_dict()
+  File "/Library/Frameworks/Python.framework/Versions/3.13/lib/python3.13/site-packages/nba_api/library/http.py", line 42, in get_dict
+    return json.loads(self._response)
+           ~~~~~~~~~~^^^^^^^^^^^^^^^^
+  File "/Library/Frameworks/Python.framework/Versions/3.13/lib/python3.13/json/__init__.py", line 346, in loads
+    return _default_decoder.decode(s)
+           ~~~~~~~~~~~~~~~~~~~~~~~^^^
+  File "/Library/Frameworks/Python.framework/Versions/3.13/lib/python3.13/json/decoder.py", line 345, in decode
+    obj, end = self.raw_decode(s, idx=_w(s, 0).end())
+               ~~~~~~~~~~~~~~~^^^^^^^^^^^^^^^^^^^^^^^
+  File "/Library/Frameworks/Python.framework/Versions/3.13/lib/python3.13/json/decoder.py", line 363, in raw_decode
+    raise JSONDecodeError("Expecting value", s, err.value) from None
+json.decoder.JSONDecodeError: Expecting value: line 1 column 1 (char 0)
+
+2026-05-17 01:19:54 | game_id=0022500451  matchup=TOR vs ORL  JSONDecodeError: Expecting value: line 1 column 1 (char 0)
+Traceback (most recent call last):
+  File "/Users/jadensmiles/EthicalHoopsIndex/run_season.py", line 331, in run_game
+    data, shots_failed = pull_game_data(game_id)
+                         ~~~~~~~~~~~~~~^^^^^^^^^
+  File "/Users/jadensmiles/EthicalHoopsIndex/run_season.py", line 287, in pull_game_data
+    hustle = _pull_hustle(game_id)
+  File "/Users/jadensmiles/EthicalHoopsIndex/run_season.py", line 222, in _pull_hustle
+    return _with_retry(_fetch, label="BoxScoreHustleV2")
+  File "/Users/jadensmiles/EthicalHoopsIndex/run_season.py", line 75, in _with_retry
+    result = fn()
+  File "/Users/jadensmiles/EthicalHoopsIndex/run_season.py", line 219, in _fetch
+    return boxscorehustlev2.BoxScoreHustleV2(
+           ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~^
+        game_id=game_id, timeout=60
+        ^^^^^^^^^^^^^^^^^^^^^^^^^^^
+    ).get_data_frames()[0]
+    ^
+  File "/Library/Frameworks/Python.framework/Versions/3.13/lib/python3.13/site-packages/nba_api/stats/endpoints/boxscorehustlev2.py", line 81, in __init__
+    self.get_request()
+    ~~~~~~~~~~~~~~~~^^
+  File "/Library/Frameworks/Python.framework/Versions/3.13/lib/python3.13/site-packages/nba_api/stats/endpoints/boxscorehustlev2.py", line 91, in get_request
+    self.load_response()
+    ~~~~~~~~~~~~~~~~~~^^
+  File "/Library/Frameworks/Python.framework/Versions/3.13/lib/python3.13/site-packages/nba_api/stats/endpoints/boxscorehustlev2.py", line 94, in load_response
+    data_sets = self.nba_response.get_data_sets(self.endpoint)
+  File "/Library/Frameworks/Python.framework/Versions/3.13/lib/python3.13/site-packages/nba_api/stats/library/http.py", line 97, in get_data_sets
+    raw_dict = self.get_dict()
+  File "/Library/Frameworks/Python.framework/Versions/3.13/lib/python3.13/site-packages/nba_api/library/http.py", line 42, in get_dict
+    return json.loads(self._response)
+           ~~~~~~~~~~^^^^^^^^^^^^^^^^
+  File "/Library/Frameworks/Python.framework/Versions/3.13/lib/python3.13/json/__init__.py", line 346, in loads
+    return _default_decoder.decode(s)
+           ~~~~~~~~~~~~~~~~~~~~~~~^^^
+  File "/Library/Frameworks/Python.framework/Versions/3.13/lib/python3.13/json/decoder.py", line 345, in decode
+    obj, end = self.raw_decode(s, idx=_w(s, 0).end())
+               ~~~~~~~~~~~~~~~^^^^^^^^^^^^^^^^^^^^^^^
+  File "/Library/Frameworks/Python.framework/Versions/3.13/lib/python3.13/json/decoder.py", line 363, in raw_decode
+    raise JSONDecodeError("Expecting value", s, err.value) from None
+json.decoder.JSONDecodeError: Expecting value: line 1 column 1 (char 0)
+
+2026-05-17 01:21:16 | game_id=0022500455  matchup=OKC vs ATL  JSONDecodeError: Expecting value: line 1 column 1 (char 0)
+Traceback (most recent call last):
+  File "/Users/jadensmiles/EthicalHoopsIndex/run_season.py", line 331, in run_game
+    data, shots_failed = pull_game_data(game_id)
+                         ~~~~~~~~~~~~~~^^^^^^^^^
+  File "/Users/jadensmiles/EthicalHoopsIndex/run_season.py", line 287, in pull_game_data
+    hustle = _pull_hustle(game_id)
+  File "/Users/jadensmiles/EthicalHoopsIndex/run_season.py", line 222, in _pull_hustle
+    return _with_retry(_fetch, label="BoxScoreHustleV2")
+  File "/Users/jadensmiles/EthicalHoopsIndex/run_season.py", line 75, in _with_retry
+    result = fn()
+  File "/Users/jadensmiles/EthicalHoopsIndex/run_season.py", line 219, in _fetch
+    return boxscorehustlev2.BoxScoreHustleV2(
+           ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~^
+        game_id=game_id, timeout=60
+        ^^^^^^^^^^^^^^^^^^^^^^^^^^^
+    ).get_data_frames()[0]
+    ^
+  File "/Library/Frameworks/Python.framework/Versions/3.13/lib/python3.13/site-packages/nba_api/stats/endpoints/boxscorehustlev2.py", line 81, in __init__
+    self.get_request()
+    ~~~~~~~~~~~~~~~~^^
+  File "/Library/Frameworks/Python.framework/Versions/3.13/lib/python3.13/site-packages/nba_api/stats/endpoints/boxscorehustlev2.py", line 91, in get_request
+    self.load_response()
+    ~~~~~~~~~~~~~~~~~~^^
+  File "/Library/Frameworks/Python.framework/Versions/3.13/lib/python3.13/site-packages/nba_api/stats/endpoints/boxscorehustlev2.py", line 94, in load_response
+    data_sets = self.nba_response.get_data_sets(self.endpoint)
+  File "/Library/Frameworks/Python.framework/Versions/3.13/lib/python3.13/site-packages/nba_api/stats/library/http.py", line 97, in get_data_sets
+    raw_dict = self.get_dict()
+  File "/Library/Frameworks/Python.framework/Versions/3.13/lib/python3.13/site-packages/nba_api/library/http.py", line 42, in get_dict
+    return json.loads(self._response)
+           ~~~~~~~~~~^^^^^^^^^^^^^^^^
+  File "/Library/Frameworks/Python.framework/Versions/3.13/lib/python3.13/json/__init__.py", line 346, in loads
+    return _default_decoder.decode(s)
+           ~~~~~~~~~~~~~~~~~~~~~~~^^^
+  File "/Library/Frameworks/Python.framework/Versions/3.13/lib/python3.13/json/decoder.py", line 345, in decode
+    obj, end = self.raw_decode(s, idx=_w(s, 0).end())
+               ~~~~~~~~~~~~~~~^^^^^^^^^^^^^^^^^^^^^^^
+  File "/Library/Frameworks/Python.framework/Versions/3.13/lib/python3.13/json/decoder.py", line 363, in raw_decode
+    raise JSONDecodeError("Expecting value", s, err.value) from None
+json.decoder.JSONDecodeError: Expecting value: line 1 column 1 (char 0)
+
+2026-05-17 01:22:39 | game_id=0022500449  matchup=BKN vs GSW  JSONDecodeError: Expecting value: line 1 column 1 (char 0)
+Traceback (most recent call last):
+  File "/Users/jadensmiles/EthicalHoopsIndex/run_season.py", line 331, in run_game
+    data, shots_failed = pull_game_data(game_id)
+                         ~~~~~~~~~~~~~~^^^^^^^^^
+  File "/Users/jadensmiles/EthicalHoopsIndex/run_season.py", line 287, in pull_game_data
+    hustle = _pull_hustle(game_id)
+  File "/Users/jadensmiles/EthicalHoopsIndex/run_season.py", line 222, in _pull_hustle
+    return _with_retry(_fetch, label="BoxScoreHustleV2")
+  File "/Users/jadensmiles/EthicalHoopsIndex/run_season.py", line 75, in _with_retry
+    result = fn()
+  File "/Users/jadensmiles/EthicalHoopsIndex/run_season.py", line 219, in _fetch
+    return boxscorehustlev2.BoxScoreHustleV2(
+           ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~^
+        game_id=game_id, timeout=60
+        ^^^^^^^^^^^^^^^^^^^^^^^^^^^
+    ).get_data_frames()[0]
+    ^
+  File "/Library/Frameworks/Python.framework/Versions/3.13/lib/python3.13/site-packages/nba_api/stats/endpoints/boxscorehustlev2.py", line 81, in __init__
+    self.get_request()
+    ~~~~~~~~~~~~~~~~^^
+  File "/Library/Frameworks/Python.framework/Versions/3.13/lib/python3.13/site-packages/nba_api/stats/endpoints/boxscorehustlev2.py", line 91, in get_request
+    self.load_response()
+    ~~~~~~~~~~~~~~~~~~^^
+  File "/Library/Frameworks/Python.framework/Versions/3.13/lib/python3.13/site-packages/nba_api/stats/endpoints/boxscorehustlev2.py", line 94, in load_response
+    data_sets = self.nba_response.get_data_sets(self.endpoint)
+  File "/Library/Frameworks/Python.framework/Versions/3.13/lib/python3.13/site-packages/nba_api/stats/library/http.py", line 97, in get_data_sets
+    raw_dict = self.get_dict()
+  File "/Library/Frameworks/Python.framework/Versions/3.13/lib/python3.13/site-packages/nba_api/library/http.py", line 42, in get_dict
+    return json.loads(self._response)
+           ~~~~~~~~~~^^^^^^^^^^^^^^^^
+  File "/Library/Frameworks/Python.framework/Versions/3.13/lib/python3.13/json/__init__.py", line 346, in loads
+    return _default_decoder.decode(s)
+           ~~~~~~~~~~~~~~~~~~~~~~~^^^
+  File "/Library/Frameworks/Python.framework/Versions/3.13/lib/python3.13/json/decoder.py", line 345, in decode
+    obj, end = self.raw_decode(s, idx=_w(s, 0).end())
+               ~~~~~~~~~~~~~~~^^^^^^^^^^^^^^^^^^^^^^^
+  File "/Library/Frameworks/Python.framework/Versions/3.13/lib/python3.13/json/decoder.py", line 363, in raw_decode
+    raise JSONDecodeError("Expecting value", s, err.value) from None
+json.decoder.JSONDecodeError: Expecting value: line 1 column 1 (char 0)
+
+2026-05-17 01:24:02 | game_id=0022500447  matchup=CHA vs MIL  JSONDecodeError: Expecting value: line 1 column 1 (char 0)
+Traceback (most recent call last):
+  File "/Users/jadensmiles/EthicalHoopsIndex/run_season.py", line 331, in run_game
+    data, shots_failed = pull_game_data(game_id)
+                         ~~~~~~~~~~~~~~^^^^^^^^^
+  File "/Users/jadensmiles/EthicalHoopsIndex/run_season.py", line 287, in pull_game_data
+    hustle = _pull_hustle(game_id)
+  File "/Users/jadensmiles/EthicalHoopsIndex/run_season.py", line 222, in _pull_hustle
+    return _with_retry(_fetch, label="BoxScoreHustleV2")
+  File "/Users/jadensmiles/EthicalHoopsIndex/run_season.py", line 75, in _with_retry
+    result = fn()
+  File "/Users/jadensmiles/EthicalHoopsIndex/run_season.py", line 219, in _fetch
+    return boxscorehustlev2.BoxScoreHustleV2(
+           ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~^
+        game_id=game_id, timeout=60
+        ^^^^^^^^^^^^^^^^^^^^^^^^^^^
+    ).get_data_frames()[0]
+    ^
+  File "/Library/Frameworks/Python.framework/Versions/3.13/lib/python3.13/site-packages/nba_api/stats/endpoints/boxscorehustlev2.py", line 81, in __init__
+    self.get_request()
+    ~~~~~~~~~~~~~~~~^^
+  File "/Library/Frameworks/Python.framework/Versions/3.13/lib/python3.13/site-packages/nba_api/stats/endpoints/boxscorehustlev2.py", line 91, in get_request
+    self.load_response()
+    ~~~~~~~~~~~~~~~~~~^^
+  File "/Library/Frameworks/Python.framework/Versions/3.13/lib/python3.13/site-packages/nba_api/stats/endpoints/boxscorehustlev2.py", line 94, in load_response
+    data_sets = self.nba_response.get_data_sets(self.endpoint)
+  File "/Library/Frameworks/Python.framework/Versions/3.13/lib/python3.13/site-packages/nba_api/stats/library/http.py", line 97, in get_data_sets
+    raw_dict = self.get_dict()
+  File "/Library/Frameworks/Python.framework/Versions/3.13/lib/python3.13/site-packages/nba_api/library/http.py", line 42, in get_dict
+    return json.loads(self._response)
+           ~~~~~~~~~~^^^^^^^^^^^^^^^^
+  File "/Library/Frameworks/Python.framework/Versions/3.13/lib/python3.13/json/__init__.py", line 346, in loads
+    return _default_decoder.decode(s)
+           ~~~~~~~~~~~~~~~~~~~~~~~^^^
+  File "/Library/Frameworks/Python.framework/Versions/3.13/lib/python3.13/json/decoder.py", line 345, in decode
+    obj, end = self.raw_decode(s, idx=_w(s, 0).end())
+               ~~~~~~~~~~~~~~~^^^^^^^^^^^^^^^^^^^^^^^
+  File "/Library/Frameworks/Python.framework/Versions/3.13/lib/python3.13/json/decoder.py", line 363, in raw_decode
+    raise JSONDecodeError("Expecting value", s, err.value) from None
+json.decoder.JSONDecodeError: Expecting value: line 1 column 1 (char 0)
+
+2026-05-17 01:25:24 | game_id=0022500457  matchup=POR vs DAL  JSONDecodeError: Expecting value: line 1 column 1 (char 0)
+Traceback (most recent call last):
+  File "/Users/jadensmiles/EthicalHoopsIndex/run_season.py", line 331, in run_game
+    data, shots_failed = pull_game_data(game_id)
+                         ~~~~~~~~~~~~~~^^^^^^^^^
+  File "/Users/jadensmiles/EthicalHoopsIndex/run_season.py", line 287, in pull_game_data
+    hustle = _pull_hustle(game_id)
+  File "/Users/jadensmiles/EthicalHoopsIndex/run_season.py", line 222, in _pull_hustle
+    return _with_retry(_fetch, label="BoxScoreHustleV2")
+  File "/Users/jadensmiles/EthicalHoopsIndex/run_season.py", line 75, in _with_retry
+    result = fn()
+  File "/Users/jadensmiles/EthicalHoopsIndex/run_season.py", line 219, in _fetch
+    return boxscorehustlev2.BoxScoreHustleV2(
+           ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~^
+        game_id=game_id, timeout=60
+        ^^^^^^^^^^^^^^^^^^^^^^^^^^^
+    ).get_data_frames()[0]
+    ^
+  File "/Library/Frameworks/Python.framework/Versions/3.13/lib/python3.13/site-packages/nba_api/stats/endpoints/boxscorehustlev2.py", line 81, in __init__
+    self.get_request()
+    ~~~~~~~~~~~~~~~~^^
+  File "/Library/Frameworks/Python.framework/Versions/3.13/lib/python3.13/site-packages/nba_api/stats/endpoints/boxscorehustlev2.py", line 91, in get_request
+    self.load_response()
+    ~~~~~~~~~~~~~~~~~~^^
+  File "/Library/Frameworks/Python.framework/Versions/3.13/lib/python3.13/site-packages/nba_api/stats/endpoints/boxscorehustlev2.py", line 94, in load_response
+    data_sets = self.nba_response.get_data_sets(self.endpoint)
+  File "/Library/Frameworks/Python.framework/Versions/3.13/lib/python3.13/site-packages/nba_api/stats/library/http.py", line 97, in get_data_sets
+    raw_dict = self.get_dict()
+  File "/Library/Frameworks/Python.framework/Versions/3.13/lib/python3.13/site-packages/nba_api/library/http.py", line 42, in get_dict
+    return json.loads(self._response)
+           ~~~~~~~~~~^^^^^^^^^^^^^^^^
+  File "/Library/Frameworks/Python.framework/Versions/3.13/lib/python3.13/json/__init__.py", line 346, in loads
+    return _default_decoder.decode(s)
+           ~~~~~~~~~~~~~~~~~~~~~~~^^^
+  File "/Library/Frameworks/Python.framework/Versions/3.13/lib/python3.13/json/decoder.py", line 345, in decode
+    obj, end = self.raw_decode(s, idx=_w(s, 0).end())
+               ~~~~~~~~~~~~~~~^^^^^^^^^^^^^^^^^^^^^^^
+  File "/Library/Frameworks/Python.framework/Versions/3.13/lib/python3.13/json/decoder.py", line 363, in raw_decode
+    raise JSONDecodeError("Expecting value", s, err.value) from None
+json.decoder.JSONDecodeError: Expecting value: line 1 column 1 (char 0)
+
+2026-05-17 01:29:09 | game_id=0022500453  matchup=HOU vs IND  JSONDecodeError: Expecting value: line 1 column 1 (char 0)
+Traceback (most recent call last):
+  File "/Users/jadensmiles/EthicalHoopsIndex/run_season.py", line 331, in run_game
+    data, shots_failed = pull_game_data(game_id)
+                         ~~~~~~~~~~~~~~^^^^^^^^^
+  File "/Users/jadensmiles/EthicalHoopsIndex/run_season.py", line 287, in pull_game_data
+    hustle = _pull_hustle(game_id)
+  File "/Users/jadensmiles/EthicalHoopsIndex/run_season.py", line 222, in _pull_hustle
+    return _with_retry(_fetch, label="BoxScoreHustleV2")
+  File "/Users/jadensmiles/EthicalHoopsIndex/run_season.py", line 75, in _with_retry
+    result = fn()
+  File "/Users/jadensmiles/EthicalHoopsIndex/run_season.py", line 219, in _fetch
+    return boxscorehustlev2.BoxScoreHustleV2(
+           ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~^
+        game_id=game_id, timeout=60
+        ^^^^^^^^^^^^^^^^^^^^^^^^^^^
+    ).get_data_frames()[0]
+    ^
+  File "/Library/Frameworks/Python.framework/Versions/3.13/lib/python3.13/site-packages/nba_api/stats/endpoints/boxscorehustlev2.py", line 81, in __init__
+    self.get_request()
+    ~~~~~~~~~~~~~~~~^^
+  File "/Library/Frameworks/Python.framework/Versions/3.13/lib/python3.13/site-packages/nba_api/stats/endpoints/boxscorehustlev2.py", line 91, in get_request
+    self.load_response()
+    ~~~~~~~~~~~~~~~~~~^^
+  File "/Library/Frameworks/Python.framework/Versions/3.13/lib/python3.13/site-packages/nba_api/stats/endpoints/boxscorehustlev2.py", line 94, in load_response
+    data_sets = self.nba_response.get_data_sets(self.endpoint)
+  File "/Library/Frameworks/Python.framework/Versions/3.13/lib/python3.13/site-packages/nba_api/stats/library/http.py", line 97, in get_data_sets
+    raw_dict = self.get_dict()
+  File "/Library/Frameworks/Python.framework/Versions/3.13/lib/python3.13/site-packages/nba_api/library/http.py", line 42, in get_dict
+    return json.loads(self._response)
+           ~~~~~~~~~~^^^^^^^^^^^^^^^^
+  File "/Library/Frameworks/Python.framework/Versions/3.13/lib/python3.13/json/__init__.py", line 346, in loads
+    return _default_decoder.decode(s)
+           ~~~~~~~~~~~~~~~~~~~~~~~^^^
+  File "/Library/Frameworks/Python.framework/Versions/3.13/lib/python3.13/json/decoder.py", line 345, in decode
+    obj, end = self.raw_decode(s, idx=_w(s, 0).end())
+               ~~~~~~~~~~~~~~~^^^^^^^^^^^^^^^^^^^^^^^
+  File "/Library/Frameworks/Python.framework/Versions/3.13/lib/python3.13/json/decoder.py", line 363, in raw_decode
+    raise JSONDecodeError("Expecting value", s, err.value) from None
+json.decoder.JSONDecodeError: Expecting value: line 1 column 1 (char 0)
+
+2026-05-17 06:15:08 | game_id=0022501128  matchup=SAC vs NOP  JSONDecodeError: Expecting value: line 1 column 1 (char 0)
+Traceback (most recent call last):
+  File "/Users/jadensmiles/EthicalHoopsIndex/run_season.py", line 331, in run_game
+    data, shots_failed = pull_game_data(game_id)
+                         ~~~~~~~~~~~~~~^^^^^^^^^
+  File "/Users/jadensmiles/EthicalHoopsIndex/run_season.py", line 287, in pull_game_data
+    hustle = _pull_hustle(game_id)
+  File "/Users/jadensmiles/EthicalHoopsIndex/run_season.py", line 222, in _pull_hustle
+    return _with_retry(_fetch, label="BoxScoreHustleV2")
+  File "/Users/jadensmiles/EthicalHoopsIndex/run_season.py", line 75, in _with_retry
+    result = fn()
+  File "/Users/jadensmiles/EthicalHoopsIndex/run_season.py", line 219, in _fetch
+    return boxscorehustlev2.BoxScoreHustleV2(
+           ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~^
+        game_id=game_id, timeout=60
+        ^^^^^^^^^^^^^^^^^^^^^^^^^^^
+    ).get_data_frames()[0]
+    ^
+  File "/Library/Frameworks/Python.framework/Versions/3.13/lib/python3.13/site-packages/nba_api/stats/endpoints/boxscorehustlev2.py", line 81, in __init__
+    self.get_request()
+    ~~~~~~~~~~~~~~~~^^
+  File "/Library/Frameworks/Python.framework/Versions/3.13/lib/python3.13/site-packages/nba_api/stats/endpoints/boxscorehustlev2.py", line 91, in get_request
+    self.load_response()
+    ~~~~~~~~~~~~~~~~~~^^
+  File "/Library/Frameworks/Python.framework/Versions/3.13/lib/python3.13/site-packages/nba_api/stats/endpoints/boxscorehustlev2.py", line 94, in load_response
+    data_sets = self.nba_response.get_data_sets(self.endpoint)
+  File "/Library/Frameworks/Python.framework/Versions/3.13/lib/python3.13/site-packages/nba_api/stats/library/http.py", line 97, in get_data_sets
+    raw_dict = self.get_dict()
+  File "/Library/Frameworks/Python.framework/Versions/3.13/lib/python3.13/site-packages/nba_api/library/http.py", line 42, in get_dict
+    return json.loads(self._response)
+           ~~~~~~~~~~^^^^^^^^^^^^^^^^
+  File "/Library/Frameworks/Python.framework/Versions/3.13/lib/python3.13/json/__init__.py", line 346, in loads
+    return _default_decoder.decode(s)
+           ~~~~~~~~~~~~~~~~~~~~~~~^^^
+  File "/Library/Frameworks/Python.framework/Versions/3.13/lib/python3.13/json/decoder.py", line 345, in decode
+    obj, end = self.raw_decode(s, idx=_w(s, 0).end())
+               ~~~~~~~~~~~~~~~^^^^^^^^^^^^^^^^^^^^^^^
+  File "/Library/Frameworks/Python.framework/Versions/3.13/lib/python3.13/json/decoder.py", line 363, in raw_decode
+    raise JSONDecodeError("Expecting value", s, err.value) from None
+json.decoder.JSONDecodeError: Expecting value: line 1 column 1 (char 0)
+
+2026-05-17 06:16:31 | game_id=0022501127  matchup=DAL vs ORL  JSONDecodeError: Expecting value: line 1 column 1 (char 0)
+Traceback (most recent call last):
+  File "/Users/jadensmiles/EthicalHoopsIndex/run_season.py", line 331, in run_game
+    data, shots_failed = pull_game_data(game_id)
+                         ~~~~~~~~~~~~~~^^^^^^^^^
+  File "/Users/jadensmiles/EthicalHoopsIndex/run_season.py", line 287, in pull_game_data
+    hustle = _pull_hustle(game_id)
+  File "/Users/jadensmiles/EthicalHoopsIndex/run_season.py", line 222, in _pull_hustle
+    return _with_retry(_fetch, label="BoxScoreHustleV2")
+  File "/Users/jadensmiles/EthicalHoopsIndex/run_season.py", line 75, in _with_retry
+    result = fn()
+  File "/Users/jadensmiles/EthicalHoopsIndex/run_season.py", line 219, in _fetch
+    return boxscorehustlev2.BoxScoreHustleV2(
+           ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~^
+        game_id=game_id, timeout=60
+        ^^^^^^^^^^^^^^^^^^^^^^^^^^^
+    ).get_data_frames()[0]
+    ^
+  File "/Library/Frameworks/Python.framework/Versions/3.13/lib/python3.13/site-packages/nba_api/stats/endpoints/boxscorehustlev2.py", line 81, in __init__
+    self.get_request()
+    ~~~~~~~~~~~~~~~~^^
+  File "/Library/Frameworks/Python.framework/Versions/3.13/lib/python3.13/site-packages/nba_api/stats/endpoints/boxscorehustlev2.py", line 91, in get_request
+    self.load_response()
+    ~~~~~~~~~~~~~~~~~~^^
+  File "/Library/Frameworks/Python.framework/Versions/3.13/lib/python3.13/site-packages/nba_api/stats/endpoints/boxscorehustlev2.py", line 94, in load_response
+    data_sets = self.nba_response.get_data_sets(self.endpoint)
+  File "/Library/Frameworks/Python.framework/Versions/3.13/lib/python3.13/site-packages/nba_api/stats/library/http.py", line 97, in get_data_sets
+    raw_dict = self.get_dict()
+  File "/Library/Frameworks/Python.framework/Versions/3.13/lib/python3.13/site-packages/nba_api/library/http.py", line 42, in get_dict
+    return json.loads(self._response)
+           ~~~~~~~~~~^^^^^^^^^^^^^^^^
+  File "/Library/Frameworks/Python.framework/Versions/3.13/lib/python3.13/json/__init__.py", line 346, in loads
+    return _default_decoder.decode(s)
+           ~~~~~~~~~~~~~~~~~~~~~~~^^^
+  File "/Library/Frameworks/Python.framework/Versions/3.13/lib/python3.13/json/decoder.py", line 345, in decode
+    obj, end = self.raw_decode(s, idx=_w(s, 0).end())
+               ~~~~~~~~~~~~~~~^^^^^^^^^^^^^^^^^^^^^^^
+  File "/Library/Frameworks/Python.framework/Versions/3.13/lib/python3.13/json/decoder.py", line 363, in raw_decode
+    raise JSONDecodeError("Expecting value", s, err.value) from None
+json.decoder.JSONDecodeError: Expecting value: line 1 column 1 (char 0)
+
+2026-05-17 06:17:53 | game_id=0022501129  matchup=MIA vs WAS  JSONDecodeError: Expecting value: line 1 column 1 (char 0)
+Traceback (most recent call last):
+  File "/Users/jadensmiles/EthicalHoopsIndex/run_season.py", line 331, in run_game
+    data, shots_failed = pull_game_data(game_id)
+                         ~~~~~~~~~~~~~~^^^^^^^^^
+  File "/Users/jadensmiles/EthicalHoopsIndex/run_season.py", line 287, in pull_game_data
+    hustle = _pull_hustle(game_id)
+  File "/Users/jadensmiles/EthicalHoopsIndex/run_season.py", line 222, in _pull_hustle
+    return _with_retry(_fetch, label="BoxScoreHustleV2")
+  File "/Users/jadensmiles/EthicalHoopsIndex/run_season.py", line 75, in _with_retry
+    result = fn()
+  File "/Users/jadensmiles/EthicalHoopsIndex/run_season.py", line 219, in _fetch
+    return boxscorehustlev2.BoxScoreHustleV2(
+           ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~^
+        game_id=game_id, timeout=60
+        ^^^^^^^^^^^^^^^^^^^^^^^^^^^
+    ).get_data_frames()[0]
+    ^
+  File "/Library/Frameworks/Python.framework/Versions/3.13/lib/python3.13/site-packages/nba_api/stats/endpoints/boxscorehustlev2.py", line 81, in __init__
+    self.get_request()
+    ~~~~~~~~~~~~~~~~^^
+  File "/Library/Frameworks/Python.framework/Versions/3.13/lib/python3.13/site-packages/nba_api/stats/endpoints/boxscorehustlev2.py", line 91, in get_request
+    self.load_response()
+    ~~~~~~~~~~~~~~~~~~^^
+  File "/Library/Frameworks/Python.framework/Versions/3.13/lib/python3.13/site-packages/nba_api/stats/endpoints/boxscorehustlev2.py", line 94, in load_response
+    data_sets = self.nba_response.get_data_sets(self.endpoint)
+  File "/Library/Frameworks/Python.framework/Versions/3.13/lib/python3.13/site-packages/nba_api/stats/library/http.py", line 97, in get_data_sets
+    raw_dict = self.get_dict()
+  File "/Library/Frameworks/Python.framework/Versions/3.13/lib/python3.13/site-packages/nba_api/library/http.py", line 42, in get_dict
+    return json.loads(self._response)
+           ~~~~~~~~~~^^^^^^^^^^^^^^^^
+  File "/Library/Frameworks/Python.framework/Versions/3.13/lib/python3.13/json/__init__.py", line 346, in loads
+    return _default_decoder.decode(s)
+           ~~~~~~~~~~~~~~~~~~~~~~~^^^
+  File "/Library/Frameworks/Python.framework/Versions/3.13/lib/python3.13/json/decoder.py", line 345, in decode
+    obj, end = self.raw_decode(s, idx=_w(s, 0).end())
+               ~~~~~~~~~~~~~~~^^^^^^^^^^^^^^^^^^^^^^^
+  File "/Library/Frameworks/Python.framework/Versions/3.13/lib/python3.13/json/decoder.py", line 363, in raw_decode
+    raise JSONDecodeError("Expecting value", s, err.value) from None
+json.decoder.JSONDecodeError: Expecting value: line 1 column 1 (char 0)
+

@@ -91,6 +91,45 @@ def _with_retry(fn, label: str = ""):
 
 # ─── SEASON GAME INDEX ────────────────────────────────────────────────────────
 
+def fetch_game_meta(game_id: str) -> dict:
+    """
+    Fetch minimal metadata for a single game_id via LeagueGameFinder.
+    Returns {game_id, date, home_team, away_team}.
+    """
+    def _fetch():
+        all_games = leaguegamefinder.LeagueGameFinder(
+            season_nullable='2025-26',
+            season_type_nullable='Regular Season',
+            timeout=90,
+        ).get_data_frames()[0]
+        return all_games[all_games['GAME_ID'] == game_id]
+
+    df = _with_retry(_fetch, label=f"LeagueGameFinder(season filter game_id={game_id})")
+
+    if df.empty:
+        raise ValueError(f"No game found for game_id={game_id}")
+
+    home_row = None
+    fallback  = None
+
+    for _, row in df.iterrows():
+        matchup = str(row.get("MATCHUP", ""))
+        date    = str(row.get("GAME_DATE", ""))
+        if " vs. " in matchup:
+            parts = matchup.split(" vs. ")
+            home, away = parts[0].strip(), parts[1].strip()
+            home_row = {"game_id": game_id, "date": date, "home_team": home, "away_team": away}
+        elif fallback is None:
+            if " @ " in matchup:
+                parts = matchup.split(" @ ")
+                away, home = parts[0].strip(), parts[1].strip()
+            else:
+                home, away = "UNK", "UNK"
+            fallback = {"game_id": game_id, "date": date, "home_team": home, "away_team": away}
+
+    return home_row or fallback
+
+
 def fetch_season_games() -> list[dict]:
     """
     Return a deduplicated, date-sorted list of all regular-season games.
@@ -379,20 +418,38 @@ def main() -> None:
     print("Database initialised.")
     compute_ehi.print_empirical_xefg_table()
 
-    games = fetch_season_games()
-    total = len(games)
-
-    # Optional CLI subset: python3 run_season.py START END  (1-indexed, inclusive)
-    # e.g.  python3 run_season.py 1 50   → process games 1–50
-    if len(sys.argv) == 3:
-        try:
-            lo = int(sys.argv[1]) - 1
-            hi = int(sys.argv[2])
-            games = games[lo:hi]
-            print(f"  Running subset: games {sys.argv[1]}–{sys.argv[2]} ({len(games)} games)")
-        except ValueError:
-            print("  Usage: python3 run_season.py [START END]  (1-indexed)")
+    # ── Retry mode: process specific game IDs, skip LeagueGameFinder ────────────
+    if "--retry" in sys.argv:
+        retry_idx = sys.argv.index("--retry")
+        retry_ids = sys.argv[retry_idx + 1:]
+        if not retry_ids:
+            print("  Usage: python3 run_season.py --retry GAME_ID [GAME_ID ...]")
             sys.exit(1)
+
+        print(f"Retry mode — fetching metadata for {len(retry_ids)} game(s) …")
+        games = []
+        for gid in retry_ids:
+            print(f"  Looking up {gid} …")
+            meta = fetch_game_meta(gid)
+            print(f"    → {meta['home_team']} vs {meta['away_team']} on {meta['date']}")
+            games.append(meta)
+
+    # ── Normal mode: full season from LeagueGameFinder ────────────────────────
+    else:
+        games = fetch_season_games()
+        total = len(games)
+
+        # Optional CLI subset: python3 run_season.py START END  (1-indexed, inclusive)
+        # e.g.  python3 run_season.py 1 50   → process games 1–50
+        if len(sys.argv) == 3:
+            try:
+                lo = int(sys.argv[1]) - 1
+                hi = int(sys.argv[2])
+                games = games[lo:hi]
+                print(f"  Running subset: games {sys.argv[1]}–{sys.argv[2]} ({len(games)} games)")
+            except ValueError:
+                print("  Usage: python3 run_season.py [START END]  (1-indexed)")
+                sys.exit(1)
 
     total = len(games)
     stats: dict = {

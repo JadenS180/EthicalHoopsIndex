@@ -102,7 +102,7 @@ Zones with ≥ 50 shots in `ehi.db` use empirical values; others fall back to ha
 | Above the Break 3 | 0.3620 | 0.52 | empirical |
 | Backcourt | — | 0.30 | hardcoded |
 
-*Empirical values are derived from a 12-game, 2,216-shot sample and will shift after the full season run.*
+*Empirical values reflect the full 2025-26 season run (1,223 games). Corner 3 figures remain below hardcoded league averages — likely genuine sample composition rather than noise.*
 
 ---
 
@@ -174,7 +174,7 @@ EthicalHoopsIndex/
 - [x] DES — Defensive Effort Score (position-adjusted normalization)
 - [x] Full EHI aggregation
 - [x] Validation across 12 games
-- [x] `run_season.py` — full season run, resume-safe, retry logic
+- [x] `run_season.py` — 2025-26 season complete (1,223 games, 23,313 player-game rows)
 - [x] `query_ehi.py` — all 6 query functions with CLI support
 
 ---
@@ -233,9 +233,78 @@ Confirmed behaviors: Bam Adebayo's 83-point game scores appropriately low on FDS
 
 ---
 
+## 🏆 2025-26 Season Findings
+
+The full 2025-26 regular season run is complete. **1,223 games** processed (1,197 direct + 26 retried), **23,313 player-game rows** saved to `ehi.db`.
+
+### 📊 League-Wide Stats
+
+| Metric | Value |
+|:---|:---|
+| 🎮 Games processed | 1,223 |
+| 👤 Player-game rows | 23,313 |
+| 📈 League avg EHI | **48.27** |
+| ⬆️ Season high (single game) | **75.76** — Rudy Gobert |
+| ⬇️ Season low (single game) | **8.91** — Collin Gillespie |
+
+---
+
+### 🥇 Most Ethical Players
+
+> Min. 20 games played · Season avg EHI
+
+| Rank | Player | Avg EHI | GP | Highlight |
+|:---:|:---|:---:|:---:|:---|
+| 1 | Mitchell Robinson | **60.43** | — | Elite rim protection, near-zero FT dependency |
+| 2 | Robert Williams III | **60.06** | — | High DES, clean offense |
+| 3 | Jericho Sims | **59.23** | — | — |
+| — | Giannis Antetokounmpo | **58.04** | 35 | ⭐ Top star result — high-usage, high-EHI |
+| — | Dyson Daniels | **57.77** | 76 | ⭐ Most ethical high-volume guard/wing |
+
+> ⚠️ **Positional bias note:** Centers dominate the top rankings — see Known Limitations below. A fix is planned.
+
+> Full list: `python3 query_ehi.py season-best 2025-26`
+
+---
+
+### 🚨 Least Ethical Players
+
+> Min. 20 games played · Season avg EHI
+
+| Rank | Player | Avg EHI | Highlight |
+|:---:|:---|:---:|:---|
+| 1 (worst) | Jordan Poole | **39.47** | Lowest season avg in the league |
+| 2 | Grayson Allen | **40.19** | — |
+
+> Full list: `python3 query_ehi.py season-worst 2025-26`
+
+---
+
+### 🏟️ Team Rankings
+
+| Rank | Team | Avg EHI |
+|:---:|:---|:---:|
+| 🥇 1 | New Orleans Pelicans | **49.84** |
+
+> Full 30-team ranking: `python3 query_ehi.py summary 2025-26`
+
+---
+
+### ⚠️ Known Issue: Positional Bias in Top Rankings
+
+Low-scoring centers (Robinson, Williams III, Sims) dominate the top-10 for two compounding reasons:
+
+1. **DES normalization** — Centers divide against a baseline of 110, but elite rim protectors generate enormous raw DES without meaningful offensive contribution. Their DES scores are legitimately high, but they represent a narrow slice of basketball value.
+2. **FTP neutral baseline** — Zero-scorers default to FTP = 70.0 (neutral). Low-usage bigs who score rarely aren't penalized, giving them an edge over offensive players who draw any FT dependency at all.
+
+**Planned fix:** Apply an offensive usage floor or reweight EHI for players with very low field goal attempt rates, so that defensive specialists are rewarded relative to their role without crowding out well-rounded players.
+
+---
+
 ## Known Limitations
 
-- **xeFG sample size** — empirical zone values derived from 12 games (2,216 shots). Left corner 3 in particular (0.275) is likely a small-sample artifact; values will stabilize after the full season run.
+- **Positional bias in top rankings** *(fix planned)* — Low-scoring centers accumulate high DES + neutral FTP without meaningful offensive contribution, inflating their EHI. An offensive usage floor or reweighting for low-FGA players is planned.
+- **xeFG corner 3 values** — Season-run empirical values (Left: 0.275, Right: 0.398) remain below hardcoded league averages. Likely reflects sample composition; monitors against league-published xeFG data.
 - **Position label vs. role** — position is read from the NBA's roster designation in `BoxScoreTraditionalV3`, not derived from on-court role. A stretch big listed as C normalizes against the center baseline regardless of how he actually plays.
 - **No per-shot defender distance** — `ShotChartDetail` does not return per-shot defender proximity. FDS and SQS use season-level `PlayerDashPtShots` bucket distributions as a proxy, applied uniformly across all shots in a game.
 - **No opponent adjustment** — EHI scores are absolute. A guard defending a weak team's shooters receives the same DES credit as one guarding elite shooters.

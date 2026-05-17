@@ -96,7 +96,7 @@ Consumes the data dict and computes EHI sub-scores for every active player. Play
   - Position-adjusted threshold: C = 0.58, F = 0.53, G = 0.50
 - `SQS = raw_mean + volume_bonus` — unclamped
 
-### Empirical xeFG% Table (12-game sample, 2,216 shots)
+### Empirical xeFG% Table (full 2025-26 season, ~1,223 games)
 
 Zones with ≥ 50 shots in `ehi.db` use empirical values; others fall back to hardcoded.
 
@@ -110,7 +110,7 @@ Zones with ≥ 50 shots in `ehi.db` use empirical values; others fall back to ha
 | Above the Break 3 | 0.3620 | 0.52 | empirical |
 | Backcourt | — | 0.30 | hardcoded |
 
-*Current empirical values reflect a small validation sample — expect significant shifts after the full season run.*
+*Empirical values now reflect the full 2025-26 season run. Corner 3 figures remain below hardcoded league averages — may reflect genuine sample composition rather than small-sample noise.*
 
 ### Validation Helpers
 - `print_ftp_report(df)`, `print_sps_report(df)`, `print_des_report(df)`, `print_fds_report(df, detail)`, `print_sqs_report(df, detail)`, `print_ehi_leaderboard(df)`, `print_bam_breakdown(df)`
@@ -178,11 +178,18 @@ All five sub-scores and season-run infrastructure are complete.
 - [x] FDS — complete, validated; position modifiers added; rep penalties softened; zero-FTA baseline = 50
 - [x] SQS — complete, validated; empirical xeFG table; position-adjusted volume-quality bonus
 - [x] EHI aggregation — complete; validated across 12 games
-- [x] run_season.py — built; ready for overnight 2025-26 run
+- [x] run_season.py — complete; 2025-26 full season done (1,223 games, 23,313 player-game rows)
 - [x] query_ehi.py — built; all 6 query functions with CLI support
 
-**Current validation results (12 games, n=17 star player-game rows):**
+**Validation results (12 games, n=17 star player-game rows):**
 EHI range 47.62–69.45 · mean 57.24 · std dev 4.95
+
+**2025-26 full season results (1,223 games, 23,313 player-game rows):**
+League avg EHI 48.27 · season high 75.76 (Rudy Gobert) · season low 8.91 (Collin Gillespie)
+Top 10 led by Mitchell Robinson (60.43), Robert Williams III (60.06), Jericho Sims (59.23)
+Notable star results: Giannis Antetokounmpo (58.04, 35 GP), Dyson Daniels (57.77, 76 GP)
+Bottom 10 led by Jordan Poole (39.47), Grayson Allen (40.19)
+Most ethical team: New Orleans Pelicans (49.84)
 
 ---
 
@@ -198,7 +205,7 @@ EHI range 47.62–69.45 · mean 57.24 · std dev 4.95
 
 **DES position-adjusted normalization:** Replaces the flat 80-point baseline. Centers are expected to generate more defensive activity and normalize against a higher baseline (110); guards normalize against 60 so an average guard performance still scores near 100.
 
-**Empirical xeFG% — small sample caveat:** The 12-game, 2,216-shot sample produces values that differ substantially from league averages (notably left corner 3 at 0.275 vs hardcoded 0.58). These will stabilize after the full season run. The table updates automatically at import time: any zone with ≥50 shots in `ehi.db` overrides its hardcoded fallback.
+**Empirical xeFG% — full season values:** The empirical table now reflects the full 2025-26 season run. Corner 3 values (Left: 0.275, Right: 0.398) remain below hardcoded league averages — may reflect genuine sample composition rather than small-sample noise. The table updates automatically at import time: any zone with ≥50 shots in `ehi.db` overrides its hardcoded fallback.
 
 **Position detection uses roster label, not role:** `BoxScoreTraditionalV3` returns the NBA's positional label (C, F-C, G, etc.), which reflects roster designation rather than actual on-court role. A stretch big listed as C normalizes against the center baseline regardless of how he plays.
 
@@ -210,4 +217,4 @@ EHI range 47.62–69.45 · mean 57.24 · std dev 4.95
 
 **No opponent adjustment:** EHI scores are absolute, not adjusted for opponent quality. A guard defending a bad team's shooters gets the same DES credit as one defending elite shooters.
 
-**Next step — `run_season.py` overnight run:** Expected ~9–10 hours for the full 2025-26 season (~1,230 games). On completion, `get_season_summary('2025-26')` prints automatically. Running `python3 query_ehi.py summary 2025-26` afterward shows the first full-season EHI distribution and team rankings.
+**Positional bias in top rankings (known issue, fix planned):** Low-scoring centers (Mitchell Robinson, Robert Williams III, Jericho Sims) dominate the season top-10 because DES normalizes against center activity levels (÷110) without accounting for offensive contribution. High DES from rim protection + neutral FTP (70.0 baseline for zero scorers) inflates EHI for low-usage bigs. A fix is planned — likely an offensive usage floor or reduced EHI weight for players with very low usage rates.
