@@ -1,5 +1,16 @@
 # 🏀 Ethical Hoops Index (EHI)
 
+## Live
+
+| | |
+|---|---|
+| 🌐 **Dashboard** | https://ehi-frontend.onrender.com |
+| 🔌 **API** | https://ehi-api.onrender.com |
+
+> The API may take ~30 seconds to respond on the first request — Render free tier spins down idle services.
+
+---
+
 A per-game NBA player ethics metric that quantifies "ethical basketball" using real tracking data. EHI scores every player on a per-game basis based on how they earned their production — rewarding skill-based scoring and disciplined defense while penalizing manipulation, deception, and laziness.
 
 > *"Ethical hoops" has been a growing conversation in the NBA for years. EHI is the first attempt to actually put a number on it.*
@@ -136,6 +147,24 @@ EHI breaks this game down honestly:
 | Data processing | `pandas` |
 | Storage | SQLite (`ehi.db`) |
 | Version control | Git / GitHub |
+| API | FastAPI (Python) |
+| Frontend | React + Vite |
+| Hosting | Render |
+
+---
+
+## Deployment
+
+The project is deployed as two services on [Render](https://render.com):
+
+| Service | Type | URL |
+|---|---|---|
+| **ehi-api** | Web Service (FastAPI) | https://ehi-api.onrender.com |
+| **ehi-frontend** | Static Site (React/Vite) | https://ehi-frontend.onrender.com |
+
+The SQLite database (`ehi.db`) is bundled directly with the API — no separate database service required.
+
+**Note:** Render free tier spins down idle web services after inactivity. The first request to the API after a period of inactivity may take ~30 seconds while the service wakes up. Subsequent requests respond normally.
 
 ---
 

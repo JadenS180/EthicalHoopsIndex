@@ -1,5 +1,15 @@
 # EthicalHoopsIndex — CLAUDE.md
 
+## Live Deployment
+
+The project is live at:
+- **Dashboard:** https://ehi-frontend.onrender.com (React/Vite static site on Render)
+- **API:** https://ehi-api.onrender.com (FastAPI on Render Web Service)
+
+The SQLite `ehi.db` is bundled with the API. The Render free tier spins down idle services — first request after inactivity takes ~30 seconds to wake up.
+
+---
+
 ## What is EHI?
 
 The **Ethical Hoops Index (EHI)** is a per-game, absolute metric that measures how "ethically" an NBA player performed. It rewards skill-based scoring, disciplined defense, and clean conduct while penalizing manipulation, deception, and laziness.
