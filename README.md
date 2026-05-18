@@ -8,18 +8,19 @@ A per-game NBA player ethics metric that quantifies "ethical basketball" using r
 
 ## What is EHI?
 
-The **Ethical Hoops Index** is a composite metric made up of 5 sub-scores:
+The **Ethical Hoops Index** is a composite metric made up of 6 sub-scores:
 
 | Sub-Score | Weight | What it measures |
 |---|---|---|
-| **SQS** — Shot Quality Score | 45% | Did you take good shots or force bad ones? |
+| **SQS** — Shot Quality Score | 35% | Did you take good shots or force bad ones? |
 | **FDS** — Foul Drawing Score | 20% | Did you earn your free throws or manufacture them? |
-| **FTP** — FT Dependency Score | 25% | What percentage of your points came from free throws? |
+| **FTP** — FT Dependency Score | 20% | FT dependency ratio, scoring volume, and playmaking contribution |
 | **SPS** — Sportsmanship Score | 5% | Techs, flagrants, illegal screens, dirty play |
 | **DES** — Defensive Effort Score | 5% | Contested shots, deflections, charges, active hands |
+| **SSS** — Scoring Skill Score | 15% | Self-created offense and assists — did you generate your own looks? |
 
 ```
-EHI = 0.45(SQS) + 0.20(FDS) + 0.25(FTP) + 0.05(SPS) + 0.05(DES)
+EHI = 0.35(SQS) + 0.20(FDS) + 0.20(FTP) + 0.05(SPS) + 0.05(DES) + 0.15(SSS)
 ```
 
 All scores are **absolute** and computed on a **per-game basis**.
@@ -52,7 +53,14 @@ EHI fills that gap.
 ```
 ratio_score  = (1 − ft_dependency_ratio) × 70
 volume_score = min(total_pts, 30)
-FTP          = ratio_score + volume_score        # naturally bounded [0, 100]
+assist_bonus = min(assists × 2.0, 20)
+FTP          = ratio_score + volume_score + assist_bonus   # can exceed 100 for elite playmakers
+```
+
+**SSS — Scoring Skill Score**
+```
+skill_score = (self_created_pts × 1.5) + (assists × 3.0) + Σ(xeFG% × 10 for qualifying self-created makes)
+SSS         = min((skill_score / 30) × 100, 100)   # zero shots/assists baseline = 20
 ```
 
 **SPS — Sportsmanship Score**
@@ -137,7 +145,7 @@ EHI breaks this game down honestly:
 EthicalHoopsIndex/
 ├── config.py            # All tunable constants and NBA API headers
 ├── pipeline.py          # Data pipeline — pulls 7 endpoints from nba_api
-├── compute_ehi.py       # EHI calculator — all 5 sub-scores + aggregation
+├── compute_ehi.py       # EHI calculator — all 6 sub-scores + aggregation
 ├── run_validation.py    # Runs pipeline across 12 hardcoded validation games
 ├── run_season.py        # Full 2025-26 season run (~1,230 games, resume-safe)
 ├── query_ehi.py         # DB query utilities (CLI + programmatic)
@@ -169,13 +177,14 @@ EthicalHoopsIndex/
 
 - [x] SQS — Shot Quality Score (empirical xeFG table; position-adjusted volume bonus)
 - [x] FDS — Foul Drawing Score (proximity, assisted/and-1 flags, position modifiers, rep penalties)
-- [x] FTP — FT Dependency Score (ratio + volume formula)
+- [x] FTP — FT Dependency Score (ratio + volume + assists bonus; can exceed 100)
 - [x] SPS — Sportsmanship Score (exponential stacking, validated)
 - [x] DES — Defensive Effort Score (position-adjusted normalization)
-- [x] Full EHI aggregation
-- [x] Validation across 12 games
-- [x] `run_season.py` — 2025-26 season complete (1,223 games, 23,313 player-game rows)
-- [x] `query_ehi.py` — all 6 query functions with CLI support
+- [x] SSS — Scoring Skill Score (self-created pts, assists, xeFG quality bonus; clamped at 100)
+- [x] Full EHI aggregation (6 sub-scores; updated weights)
+- [x] Validation across 12 games (pre-SSS formula)
+- [x] `run_season.py` — 2025-26 season complete (1,223 games, 23,313 player-game rows); **re-run tonight with new formula**
+- [x] `query_ehi.py` — 7 query functions with CLI support; role-based leaderboards added
 
 ---
 
@@ -213,7 +222,10 @@ python3 query_ehi.py game 2026-01-26 DAL ATL
 python3 query_ehi.py season-best 2025-26 20
 python3 query_ehi.py season-worst 2025-26
 
-# League-wide season summary
+# Top N by role: Stars (15+ PPG), Role Players (8–15 PPG), Bench (<8 PPG)
+python3 query_ehi.py season-roles 2025-26 10
+
+# League-wide season summary (5 sections)
 python3 query_ehi.py summary 2025-26
 ```
 
@@ -234,6 +246,8 @@ Confirmed behaviors: Bam Adebayo's 83-point game scores appropriately low on FDS
 ---
 
 ## 🏆 2025-26 Season Findings
+
+> ⚠️ **Results below are based on the pre-SSS formula (5 sub-scores, old weights). A full season re-run with the updated 6-sub-score formula is scheduled tonight. Figures will be updated after completion.**
 
 The full 2025-26 regular season run is complete. **1,223 games** processed (1,197 direct + 26 retried), **23,313 player-game rows** saved to `ehi.db`.
 
@@ -297,13 +311,13 @@ Low-scoring centers (Robinson, Williams III, Sims) dominate the top-10 for two c
 1. **DES normalization** — Centers divide against a baseline of 110, but elite rim protectors generate enormous raw DES without meaningful offensive contribution. Their DES scores are legitimately high, but they represent a narrow slice of basketball value.
 2. **FTP neutral baseline** — Zero-scorers default to FTP = 70.0 (neutral). Low-usage bigs who score rarely aren't penalized, giving them an edge over offensive players who draw any FT dependency at all.
 
-**Planned fix:** Apply an offensive usage floor or reweight EHI for players with very low field goal attempt rates, so that defensive specialists are rewarded relative to their role without crowding out well-rounded players.
+**Partial fix applied:** Role-based leaderboards (`python3 query_ehi.py season-roles 2025-26`) split players into Stars (15+ PPG), Role Players (8–15 PPG), and Bench (<8 PPG) tiers, so low-usage bigs and high-usage stars are compared within their role. An absolute formula fix (offensive usage floor or FGA-based reweighting) remains planned.
 
 ---
 
 ## Known Limitations
 
-- **Positional bias in top rankings** *(fix planned)* — Low-scoring centers accumulate high DES + neutral FTP without meaningful offensive contribution, inflating their EHI. An offensive usage floor or reweighting for low-FGA players is planned.
+- **Positional bias in top rankings** *(partially addressed)* — Low-scoring centers accumulate high DES + neutral FTP without meaningful offensive contribution, inflating their EHI. Role-based leaderboards (`season-roles`) mitigate this in per-tier comparisons. An absolute formula fix remains planned.
 - **xeFG corner 3 values** — Season-run empirical values (Left: 0.275, Right: 0.398) remain below hardcoded league averages. Likely reflects sample composition; monitors against league-published xeFG data.
 - **Position label vs. role** — position is read from the NBA's roster designation in `BoxScoreTraditionalV3`, not derived from on-court role. A stretch big listed as C normalizes against the center baseline regardless of how he actually plays.
 - **No per-shot defender distance** — `ShotChartDetail` does not return per-shot defender proximity. FDS and SQS use season-level `PlayerDashPtShots` bucket distributions as a proxy, applied uniformly across all shots in a game.

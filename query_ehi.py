@@ -479,11 +479,13 @@ def get_season_best_by_role(season: str, n: int = 10) -> None:
 def get_season_summary(season: str) -> None:
     """
     Print a comprehensive season summary:
-      - League-wide avg EHI and player-game count
-      - Highest and lowest single-game EHI with context
-      - Most ethical team by avg EHI (top 10 teams)
-      - Top 10 players by avg EHI (min MIN_GAMES GP)
-      - Bottom 10 players by avg EHI (min MIN_GAMES GP)
+      1. League-wide avg EHI and player-game count
+      2. Top 10 single-game EHI performances (player, team, opponent, date, pts, EHI)
+      3. Bottom 10 single-game EHI performances (same fields)
+      4. All 30 teams ranked by avg EHI with GP and avg PTS
+      5. Top 10 players by avg EHI (min MIN_GAMES GP)
+      6. Bottom 10 players by avg EHI (min MIN_GAMES GP)
+    Min 8 minutes played filter applied throughout.
     """
     with get_connection() as conn:
         league = conn.execute(
@@ -491,7 +493,7 @@ def get_season_summary(season: str) -> None:
             SELECT AVG(pg.EHI), COUNT(*)
             FROM player_games pg
             JOIN games g USING (game_id)
-            WHERE g.season = ?
+            WHERE g.season = ? AND pg.minutes >= 8
             """,
             (season,),
         ).fetchone()
@@ -500,39 +502,45 @@ def get_season_summary(season: str) -> None:
             print(f"\n  No data in ehi.db for season {season}.")
             return
 
-        best_row = conn.execute(
+        top_games = conn.execute(
             """
-            SELECT pg.player_name, pg.team, pg.date, pg.EHI,
-                   g.home_team || ' vs ' || g.away_team AS matchup
+            SELECT pg.player_name, pg.team,
+                   CASE WHEN pg.team = g.home_team THEN g.away_team
+                        ELSE g.home_team END AS opp,
+                   pg.date, pg.points, pg.EHI
             FROM player_games pg
             JOIN games g USING (game_id)
-            WHERE g.season = ?
-            ORDER BY pg.EHI DESC LIMIT 1
+            WHERE g.season = ? AND pg.minutes >= 8
+            ORDER BY pg.EHI DESC LIMIT 10
             """,
             (season,),
-        ).fetchone()
+        ).fetchall()
 
-        worst_row = conn.execute(
+        bot_games = conn.execute(
             """
-            SELECT pg.player_name, pg.team, pg.date, pg.EHI,
-                   g.home_team || ' vs ' || g.away_team AS matchup
+            SELECT pg.player_name, pg.team,
+                   CASE WHEN pg.team = g.home_team THEN g.away_team
+                        ELSE g.home_team END AS opp,
+                   pg.date, pg.points, pg.EHI
             FROM player_games pg
             JOIN games g USING (game_id)
-            WHERE g.season = ?
-            ORDER BY pg.EHI ASC LIMIT 1
+            WHERE g.season = ? AND pg.minutes >= 8
+            ORDER BY pg.EHI ASC LIMIT 10
             """,
             (season,),
-        ).fetchone()
+        ).fetchall()
 
         team_rows = conn.execute(
             """
-            SELECT pg.team, AVG(pg.EHI) AS avg_ehi, COUNT(*) AS n
+            SELECT pg.team,
+                   AVG(pg.EHI)                                        AS avg_ehi,
+                   COUNT(DISTINCT pg.game_id)                         AS gp,
+                   SUM(pg.points) * 1.0 / COUNT(DISTINCT pg.game_id) AS avg_pts
             FROM player_games pg
             JOIN games g USING (game_id)
-            WHERE g.season = ?
+            WHERE g.season = ? AND pg.minutes >= 8
             GROUP BY pg.team
             ORDER BY avg_ehi DESC
-            LIMIT 10
             """,
             (season,),
         ).fetchall()
@@ -543,24 +551,44 @@ def get_season_summary(season: str) -> None:
     print("\n" + "=" * W)
     print(f"EHI Season Summary — {season}")
     print("=" * W)
-
     print(f"\n  League avg EHI : {league_avg:.2f}   ({n_rows} player-game rows)")
 
-    if best_row:
-        name, team, date, val, matchup = best_row
-        print(f"  Highest EHI    : {val:.2f}  {name} ({team})  {matchup}  {date}")
+    # ── Single-game performance tables ────────────────────────────────────
+    def _print_game_table(rows: list, title: str) -> None:
+        print("\n" + "=" * W)
+        print(f"  {title} — {season}")
+        print("=" * W)
+        print(
+            f"  {'Rk':>3}  {'Player':<24}{'Tm':>4}{'Opp':>5}"
+            f"{'Date':>12}{'PTS':>5}{'EHI':>8}"
+        )
+        print("  " + "─" * (W - 2))
+        for rank, (name, team, opp, date, pts, ehi) in enumerate(rows, 1):
+            print(
+                f"  {rank:>3}  {name:<24}{team:>4}{opp:>5}"
+                f"{date:>12}{int(pts):>5}{ehi:>8.2f}"
+            )
+        print("  " + "─" * (W - 2))
+        print("=" * W)
 
-    if worst_row:
-        name, team, date, val, matchup = worst_row
-        print(f"  Lowest EHI     : {val:.2f}  {name} ({team})  {matchup}  {date}")
+    if top_games:
+        _print_game_table(top_games, "Top 10 Single-Game EHI Performances")
+    if bot_games:
+        _print_game_table(bot_games, "Bottom 10 Single-Game EHI Performances")
 
+    # ── All teams ranked by avg EHI ───────────────────────────────────────
     if team_rows:
-        print(f"\n  Most Ethical Teams — avg EHI  ({season})")
-        print(f"  {'Rk':>3}  {'Team':<6}  {'Avg EHI':>8}  {'n':>6}  Bar")
-        print("  " + "─" * 48)
-        for i, (team, avg_ehi, n) in enumerate(team_rows, 1):
+        W_T = 68
+        print("\n" + "=" * W_T)
+        print(f"  All Teams — Avg EHI Ranking  ({season})")
+        print("=" * W_T)
+        print(f"  {'Rk':>3}  {'Team':<6}{'GP':>4}{'aPTS':>7}{'aEHI':>7}  Bar")
+        print("  " + "─" * (W_T - 2))
+        for i, (team, avg_ehi, gp, avg_pts) in enumerate(team_rows, 1):
             bar = _bar(avg_ehi / 100.0, width=20)
-            print(f"  {i:>3}  {team:<6}  {avg_ehi:>8.2f}  {n:>6}  {bar}")
+            print(f"  {i:>3}  {team:<6}{gp:>4}{avg_pts:>7.1f}{avg_ehi:>7.2f}  {bar}")
+        print("  " + "─" * (W_T - 2))
+        print("=" * W_T)
 
     print()
     get_season_best(season, n=10)

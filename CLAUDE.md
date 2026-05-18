@@ -5,20 +5,21 @@
 The **Ethical Hoops Index (EHI)** is a per-game, absolute metric that measures how "ethically" an NBA player performed. It rewards skill-based scoring, disciplined defense, and clean conduct while penalizing manipulation, deception, and laziness.
 
 ```
-EHI = 0.45(SQS) + 0.20(FDS) + 0.25(FTP) + 0.05(SPS) + 0.05(DES)
+EHI = 0.35(SQS) + 0.20(FDS) + 0.20(FTP) + 0.05(SPS) + 0.05(DES) + 0.15(SSS)
 ```
 
 ---
 
-## The 5 Sub-Scores
+## The 6 Sub-Scores
 
 | Code | Name | Weight | What it measures |
 |------|------|--------|-----------------|
-| SQS | Shot Quality Score | 45% | Did the player take shots a skilled, ethical player would take? Rewards contested makes and self-created quality looks; penalizes low-xeFG% chucks. Volume-quality bonus for 15+ shots at avg xeFG ≥ position threshold (C: 0.58, F: 0.53, G: 0.50). xeFG% sourced empirically from `ehi.db` shots table where ≥50 shots per zone; hardcoded fallbacks otherwise. |
+| SQS | Shot Quality Score | 35% | Did the player take shots a skilled, ethical player would take? Rewards contested makes and self-created quality looks; penalizes low-xeFG% chucks. Volume-quality bonus for 15+ shots at avg xeFG ≥ position threshold (C: 0.58, F: 0.53, G: 0.50). xeFG% sourced empirically from `ehi.db` shots table where ≥50 shots per zone; hardcoded fallbacks otherwise. |
 | FDS | Foul Drawing Score | 20% | Did the player earn their free throws or manufacture them? Per-foul legitimacy scored via defender proximity, assisted/and-1 flags, and position modifiers (center in paint +0.10, guard at 3pt −0.10). `FDS = avg_legitimacy × 100` plus FT% modifier. Zero-FTA baseline = 50. |
-| FTP | FT Dependency Score | 25% | Combined ratio + volume score: `(1 − FT_dep_ratio) × 70 + min(pts, 30)`. Naturally bounded 0–100; no clamping needed. |
+| FTP | FT Dependency Score | 20% | Ratio + volume + assists bonus: `(1 − FT_dep_ratio) × 70 + min(pts, 30) + min(assists × 2.0, 20)`. Can exceed 100 for elite playmakers. |
 | SPS | Sportsmanship Score | 5% | Did the player conduct themselves with integrity? Starts at 100; penalties only. Exponential stacking per violation type. Floor at 0 (only sub-score with a clamp). |
 | DES | Defensive Effort Score | 5% | Did the player compete defensively? Weighted sum of contested shots, deflections, steals, blocks, defensive rebounds, charges taken; minus foul penalty. Position-adjusted normalization: C ÷ 110, F ÷ 85, G ÷ 60. Unclamped. |
+| SSS | Scoring Skill Score | 15% | Did the player create their own offense and facilitate for others? `skill_score = (self_created_pts × 1.5) + (assists × 3.0) + Σ(xeFG% × 10 for qualifying self-created makes)`; `SSS = min((skill_score / 30) × 100, 100)`. Zero shots/assists baseline = 20. |
 
 All constants (weights, thresholds, multipliers) live in `config.py`.
 
@@ -61,10 +62,10 @@ Consumes the data dict and computes EHI sub-scores for every active player. Play
 | (empty / unknown) | forward |
 
 ### FTP — FT Dependency Score
-- Formula: `ratio_score = (1 − ft_dep_ratio) × 70`; `volume_score = min(total_pts, 30)`; `FTP = ratio_score + volume_score`
-- Naturally bounded [0, 100] — no clamping needed
-- Zero scorers: `dep_ratio = 0 → FTP = 70` (neutral baseline)
-- Constants: `FTP_RATIO_WEIGHT = 70`, `FTP_VOLUME_CAP = 30`
+- Formula: `ratio_score = (1 − ft_dep_ratio) × 70`; `volume_score = min(total_pts, 30)`; `assist_bonus = min(assists × 2.0, 20)`; `FTP = ratio_score + volume_score + assist_bonus`
+- Can exceed 100 for elite playmakers (assist bonus adds up to 20 pts)
+- Zero scorers with no assists: `dep_ratio = 0 → FTP = 70` (neutral baseline)
+- Constants: `FTP_RATIO_WEIGHT = 70`, `FTP_VOLUME_CAP = 30`, `FTP_ASSIST_MULT = 2.0`, `FTP_ASSIST_CAP = 20`
 
 ### SPS — Sportsmanship Score
 - Starts at 100; `penalty = base × (count ^ SPS_STACK_EXP)` per violation type; `SPS = max(0, 100 − sum)`
@@ -95,6 +96,11 @@ Consumes the data dict and computes EHI sub-scores for every active player. Play
 - **Volume-quality bonus** if `n_shots ≥ 15` and `avg_xeFG ≥ threshold`: `SQS += (n_shots − 14) × 0.5`
   - Position-adjusted threshold: C = 0.58, F = 0.53, G = 0.50
 - `SQS = raw_mean + volume_bonus` — unclamped
+
+### SSS — Scoring Skill Score
+- `skill_score = (self_created_pts × 1.5) + (assists × 3.0) + Σ(xeFG% × 10 for each self-created make where xeFG ≥ 0.50)`
+- `SSS = min((skill_score / 30) × 100, 100)` — clamped at 100
+- Zero shots and zero assists: `SSS = SSS_ZERO_BASELINE (20)`
 
 ### Empirical xeFG% Table (full 2025-26 season, ~1,223 games)
 
@@ -150,41 +156,44 @@ Database query utilities callable both programmatically and from the command lin
 | Function | CLI command | Description |
 |---|---|---|
 | `get_player_game(name, date)` | `player-game 'Name' YYYY-MM-DD` | Full EHI breakdown (sub-scores + weighted bar chart) for one player on one date |
-| `get_player_season(name, season)` | `player 'Name' 2025-26` | Season averages: avg SQS/FDS/FTP/SPS/DES/EHI, GP, avg PTS, EHI min/max |
+| `get_player_season(name, season)` | `player 'Name' 2025-26` | Season averages: avg SQS/FDS/FTP/SPS/DES/SSS/EHI, GP, avg PTS, EHI min/max |
 | `get_game_leaderboard(date, t1, t2)` | `game YYYY-MM-DD DAL ATL` | Full leaderboard for a specific game sorted by EHI descending |
 | `get_season_best(season, n=10)` | `season-best 2025-26 [n]` | Top N players by avg EHI, minimum 20 games played |
 | `get_season_worst(season, n=10)` | `season-worst 2025-26 [n]` | Bottom N players by avg EHI, minimum 20 games played |
-| `get_season_summary(season)` | `summary 2025-26` | League avg EHI, highest/lowest game EHI, team rankings, top/bottom 10 players |
+| `get_season_best_by_role(season, n=10)` | `season-roles 2025-26 [n]` | Top N by avg EHI split into Stars (15+ PPG), Role Players (8–15 PPG), Bench (<8 PPG) |
+| `get_season_summary(season)` | `summary 2025-26` | 5-section summary: league avg, top/bottom 10 single games, all 30 teams, season best/worst 10 |
 
 **CLI examples:**
 ```bash
-python3 query_ehi.py player       'Luka Doncic'  2025-26
-python3 query_ehi.py player-game  'Luka Doncic'  2026-01-26
-python3 query_ehi.py game          2026-01-26    DAL  ATL
-python3 query_ehi.py season-best   2025-26       20
-python3 query_ehi.py season-worst  2025-26
-python3 query_ehi.py summary       2025-26
+python3 query_ehi.py player        'Luka Doncic'  2025-26
+python3 query_ehi.py player-game   'Luka Doncic'  2026-01-26
+python3 query_ehi.py game           2026-01-26    DAL  ATL
+python3 query_ehi.py season-best    2025-26       20
+python3 query_ehi.py season-worst   2025-26
+python3 query_ehi.py season-roles   2025-26       10
+python3 query_ehi.py summary        2025-26
 ```
 
 ---
 
 ## Development Approach
 
-All five sub-scores and season-run infrastructure are complete.
+All six sub-scores and season-run infrastructure are complete.
 
-- [x] FTP — complete, validated
+- [x] FTP — complete, validated; assists bonus added (2026-05-17)
 - [x] SPS — complete, validated (Coulibaly 1 tech → SPS 82.0 confirmed)
 - [x] DES — complete, validated; position-adjusted normalization (C÷110, F÷85, G÷60)
 - [x] FDS — complete, validated; position modifiers added; rep penalties softened; zero-FTA baseline = 50
 - [x] SQS — complete, validated; empirical xeFG table; position-adjusted volume-quality bonus
-- [x] EHI aggregation — complete; validated across 12 games
-- [x] run_season.py — complete; 2025-26 full season done (1,223 games, 23,313 player-game rows)
-- [x] query_ehi.py — built; all 6 query functions with CLI support
+- [x] SSS — complete (2026-05-17); zero shots/assists baseline = 20; clamped at 100
+- [x] EHI aggregation — complete; formula updated to 6 sub-scores, new weights (2026-05-17)
+- [x] run_season.py — complete; **re-run scheduled tonight with new formula** (existing rows have SSS = NULL)
+- [x] query_ehi.py — built; 7 query functions with CLI support; role-based leaderboards added
 
-**Validation results (12 games, n=17 star player-game rows):**
+**Validation results (12 games, n=17 star player-game rows) — pre-SSS formula:**
 EHI range 47.62–69.45 · mean 57.24 · std dev 4.95
 
-**2025-26 full season results (1,223 games, 23,313 player-game rows):**
+**2025-26 full season results — pre-SSS formula (pending re-run with new formula):**
 League avg EHI 48.27 · season high 75.76 (Rudy Gobert) · season low 8.91 (Collin Gillespie)
 Top 10 led by Mitchell Robinson (60.43), Robert Williams III (60.06), Jericho Sims (59.23)
 Notable star results: Giannis Antetokounmpo (58.04, 35 GP), Dyson Daniels (57.77, 76 GP)
@@ -201,7 +210,7 @@ Most ethical team: New Orleans Pelicans (49.84)
 
 **FDS defender proximity — season-level proxy:** `build_proximity_index(proximity_df)` converts season-level `CLOSE_DEF_DIST_RANGE` bucket data into per-player `{very_tight_pct, tight_pct}` fractions. Falls back to flat +0.25 if no data. Season-level is used as a game-level proxy because `PlayerDashPtShots` returns 0 rows when date-filtered to a single game.
 
-**Sub-score clamping removed:** All sub-scores except SPS float freely — no floor, no ceiling. SPS floor = 0. DES and SQS can exceed 100 for exceptional performances. FTP is naturally bounded [0, 100] by formula construction.
+**Sub-score clamping:** Most sub-scores float freely — no floor, no ceiling. SPS floor = 0 (only clamp applied below 0). SSS ceiling = 100 (clamped). DES and SQS can exceed 100 for exceptional performances. FTP can now exceed 100 for elite playmakers via the assist bonus (theoretical max ~120); it is no longer bounded at 100 by formula construction.
 
 **DES position-adjusted normalization:** Replaces the flat 80-point baseline. Centers are expected to generate more defensive activity and normalize against a higher baseline (110); guards normalize against 60 so an average guard performance still scores near 100.
 
@@ -217,4 +226,4 @@ Most ethical team: New Orleans Pelicans (49.84)
 
 **No opponent adjustment:** EHI scores are absolute, not adjusted for opponent quality. A guard defending a bad team's shooters gets the same DES credit as one defending elite shooters.
 
-**Positional bias in top rankings (known issue, fix planned):** Low-scoring centers (Mitchell Robinson, Robert Williams III, Jericho Sims) dominate the season top-10 because DES normalizes against center activity levels (÷110) without accounting for offensive contribution. High DES from rim protection + neutral FTP (70.0 baseline for zero scorers) inflates EHI for low-usage bigs. A fix is planned — likely an offensive usage floor or reduced EHI weight for players with very low usage rates.
+**Positional bias in top rankings (known issue, partially addressed):** Low-scoring centers dominate the season top-10 because DES normalizes against center activity levels (÷110) without accounting for offensive contribution. High DES from rim protection + neutral FTP (70.0 baseline for zero scorers) inflates EHI for low-usage bigs. Role-based leaderboards (`season-roles` CLI — Stars/Role/Bench tiers) mitigate this in per-tier comparisons. An absolute formula fix (offensive usage floor or FGA-based reweighting) remains planned.

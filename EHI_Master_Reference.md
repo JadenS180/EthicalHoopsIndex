@@ -11,16 +11,17 @@ Sub-scores are **unclamped** — they can exceed 100 for exceptional performance
 ## Master Formula
 
 ```
-EHI = 0.45(SQS) + 0.20(FDS) + 0.25(FTP) + 0.05(SPS) + 0.05(DES)
+EHI = 0.35(SQS) + 0.20(FDS) + 0.20(FTP) + 0.05(SPS) + 0.05(DES) + 0.15(SSS)
 ```
 
 | Sub-Score | Name | Weight |
 |---|---|---|
-| SQS | Shot Quality Score | 45% |
+| SQS | Shot Quality Score | 35% |
 | FDS | Foul Drawing Score | 20% |
-| FTP | FT Dependency Score | 25% |
+| FTP | FT Dependency Score | 20% |
 | SPS | Sportsmanship Score | 5% |
 | DES | Defensive Effort Score | 5% |
+| SSS | Scoring Skill Score | 15% |
 
 ---
 
@@ -182,7 +183,7 @@ if FTA_in_game == 0:
 
 ---
 
-## Sub-Score 3: FT Dependency Score (FTP) — 25%
+## Sub-Score 3: FT Dependency Score (FTP) — 20%
 
 ### Goal
 Reward scoring through field goals and penalize FT dependency, while recognising that high-volume FG scorers contribute more than low-volume ones at the same dependency rate.
@@ -198,14 +199,16 @@ ft_dep_ratio = FT_points / total_points   # 0.0 if total_points == 0
 
 ratio_score  = (1 - ft_dep_ratio) * 70   # max 70  (FTP_RATIO_WEIGHT)
 volume_score = min(total_points, 30)      # max 30  (FTP_VOLUME_CAP)
+assist_bonus = min(assists * 2.0, 20)     # max 20  (FTP_ASSIST_CAP)
 
-FTP = ratio_score + volume_score          # naturally in [0, 100], no clamp needed
+FTP = ratio_score + volume_score + assist_bonus   # can exceed 100 for elite playmakers
 ```
 
 ### Key Properties
-- **Zero scorers:** `dep_ratio = 0 → ratio = 70, volume = 0 → FTP = 70` (neutral)
-- **Max score (100):** requires 0% FT dependency AND ≥ 30 field-goal points
-- **Pure FT scorers:** `dep_ratio = 1.0 → ratio = 0, volume = min(ftm, 30)`
+- **Zero scorers, no assists:** `dep_ratio = 0, bonus = 0 → FTP = 70` (neutral)
+- **Max score (120):** 0% FT dependency + ≥ 30 FG points + ≥ 10 assists
+- **Pure FT scorers:** `dep_ratio = 1.0 → ratio = 0, volume = min(ftm, 30), + assist bonus`
+- Assist bonus rewards playmakers who create offense for teammates without relying on FTs
 - No exponential penalty, no edge-case overrides
 
 ### Reference Table
@@ -330,6 +333,39 @@ if all defensive stats == 0:
 
 ---
 
+## Sub-Score 6: Scoring Skill Score (SSS) — 15%
+
+### Goal
+Did the player create their own offense and facilitate for teammates through skilled playmaking?
+
+### Formula
+
+```python
+self_created_pts = points from unassisted field goals
+
+# Qualifying self-created makes: unassisted makes where xeFG >= 0.50
+qualifying_sc_makes = [s for s in shots if not s.assisted and s.made and s.xefg >= 0.50]
+
+skill_score = (self_created_pts * 1.5) \
+            + (assists * 3.0) \
+            + sum(s.xefg * 10 for s in qualifying_sc_makes)
+
+SSS = min((skill_score / 30) * 100, 100)   # clamped at 100
+
+# Zero-skill edge case
+if total_shots == 0 and assists == 0:
+    SSS = 20   # SSS_ZERO_BASELINE — neutral floor
+```
+
+### Key Properties
+- **Zero shots and zero assists:** `SSS = SSS_ZERO_BASELINE (20)` — neutral floor
+- **Assists rewarded at 3.0 pts each** — creation value for teammates
+- **Self-created points at 1.5×** — above the implied 1.0× of simply scoring
+- **Qualifying self-created makes** add an xeFG zone quality bonus
+- **Clamped at 100** — unlike DES/SQS, SSS has a hard ceiling
+
+---
+
 ## Garbage Time Rule
 
 ### Definition
@@ -385,12 +421,13 @@ if garbage_time and foul_drawn:
 
 **`query_ehi.py` CLI examples:**
 ```bash
-python3 query_ehi.py player       'Luka Doncic'  2025-26
-python3 query_ehi.py player-game  'Luka Doncic'  2026-01-26
-python3 query_ehi.py game          2026-01-26    DAL  ATL
-python3 query_ehi.py season-best   2025-26       20
-python3 query_ehi.py season-worst  2025-26
-python3 query_ehi.py summary       2025-26
+python3 query_ehi.py player        'Luka Doncic'  2025-26
+python3 query_ehi.py player-game   'Luka Doncic'  2026-01-26
+python3 query_ehi.py game           2026-01-26    DAL  ATL
+python3 query_ehi.py season-best    2025-26       20
+python3 query_ehi.py season-worst   2025-26
+python3 query_ehi.py season-roles   2025-26       10
+python3 query_ehi.py summary        2025-26
 ```
 
 ---
@@ -399,7 +436,9 @@ python3 query_ehi.py summary       2025-26
 
 Validated across **12 games** (218+ qualifying player-game rows, min ≥ 8 min, stored in `ehi.db`).
 
-**Validation stats (n=17 star player-game rows, pts ≥ 20):**
+> **Note:** Results below use the pre-SSS formula (5 sub-scores, old weights). A re-run with the 6-sub-score formula is scheduled.
+
+**Validation stats (n=17 star player-game rows, pts ≥ 20) — pre-SSS formula:**
 EHI range: **47.62–69.45** · mean: **57.24** · std dev: **4.95**
 
 Representative star-player results (run `python3 compute_ehi.py` for current values):
@@ -417,6 +456,8 @@ Representative star-player results (run `python3 compute_ehi.py` for current val
 ---
 
 ## 2025-26 Season Results
+
+> ⚠️ **Results below are based on the pre-SSS formula (5 sub-scores, old weights). A full season re-run with the 6-sub-score formula is scheduled tonight. Figures will be updated after completion.**
 
 Full season run complete. **1,223 games** processed (1,197 direct + 26 retried), **23,313 player-game rows** saved to `ehi.db`.
 
@@ -457,11 +498,12 @@ All live in `config.py`.
 
 ```python
 # ─── Weights ────────────────────────────────────────────────────────────────
-W_SQS = 0.45
+W_SQS = 0.35
 W_FDS = 0.20
-W_FTP = 0.25
+W_FTP = 0.20
 W_SPS = 0.05
 W_DES = 0.05
+W_SSS = 0.15
 
 # ─── Activity filter ────────────────────────────────────────────────────────
 MIN_MINUTES_THRESHOLD = 8   # players below this excluded entirely
@@ -503,8 +545,18 @@ VOLUME_PENALTY_BASE    = 1.0    # DEPRECATED — not applied
 VOLUME_PENALTY_EXP     = 1.15   # DEPRECATED — not applied
 
 # ─── FTP ────────────────────────────────────────────────────────────────────
-FTP_RATIO_WEIGHT = 70   # (1 - dep_ratio) * 70
-FTP_VOLUME_CAP   = 30   # min(total_pts, 30)
+FTP_RATIO_WEIGHT  = 70    # (1 - dep_ratio) * 70
+FTP_VOLUME_CAP    = 30    # min(total_pts, 30)
+FTP_ASSIST_MULT   = 2.0   # assists * FTP_ASSIST_MULT
+FTP_ASSIST_CAP    = 20    # min(assists * FTP_ASSIST_MULT, FTP_ASSIST_CAP)
+
+# ─── SSS ────────────────────────────────────────────────────────────────────
+SSS_SC_XEFG_THRESHOLD = 0.50   # xeFG threshold for qualifying self-created makes
+SSS_SC_PTS_MULT       = 1.5    # self_created_pts * SSS_SC_PTS_MULT
+SSS_ASSIST_MULT       = 3.0    # assists * SSS_ASSIST_MULT
+SSS_XEFG_MULT         = 10.0   # xeFG * SSS_XEFG_MULT for qualifying makes
+SSS_NORMALIZER        = 30.0   # (skill_score / SSS_NORMALIZER) * 100, then clamp
+SSS_ZERO_BASELINE     = 20     # zero shots and zero assists baseline
 
 # ─── SPS ────────────────────────────────────────────────────────────────────
 TECH_PENALTY        = 18
@@ -557,4 +609,4 @@ GARBAGE_FTP_PENALTY_EXP   = 1.3
 
 ---
 
-*EHI v1.3 — 2025-26 full season complete (1,223 games, 23,313 rows); league avg 48.27; positional bias identified in top rankings (fix planned); empirical xeFG table updated to full-season values*
+*EHI v1.4 — SSS (Scoring Skill Score) added as 6th sub-score (15% weight); FTP assists bonus added; weights updated (SQS 35%, FTP 20%); role-based leaderboards in query_ehi.py; 2025-26 season re-run scheduled with new formula*
