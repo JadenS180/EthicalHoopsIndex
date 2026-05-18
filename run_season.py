@@ -346,7 +346,7 @@ def pull_game_data(game_id: str) -> tuple[dict, bool]:
 
 # ─── GAME RUNNER ──────────────────────────────────────────────────────────────
 
-def run_game(meta: dict, game_num: int, total: int, stats: dict) -> None:
+def run_game(meta: dict, game_num: int, total: int, stats: dict, recalculate: bool = False) -> None:
     """
     Full pipeline for one game: pull → compute → save.
     Updates stats dict in place.
@@ -361,7 +361,7 @@ def run_game(meta: dict, game_num: int, total: int, stats: dict) -> None:
     print(f"Game {game_num}/{total} — {matchup}  ({date})  game_id={game_id}")
     print("=" * 65)
 
-    if _already_in_db(game_id):
+    if not recalculate and _already_in_db(game_id):
         print("  Already in ehi.db — skipping.")
         stats["skipped"] += 1
         return
@@ -418,10 +418,16 @@ def main() -> None:
     print("Database initialised.")
     compute_ehi.print_empirical_xefg_table()
 
+    recalculate   = "--recalculate" in sys.argv
+    remaining_args = [a for a in sys.argv[1:] if a != "--recalculate"]
+
+    if recalculate:
+        print("  --recalculate: DB check bypassed — all games will be reprocessed and upserted.")
+
     # ── Retry mode: process specific game IDs, skip LeagueGameFinder ────────────
-    if "--retry" in sys.argv:
-        retry_idx = sys.argv.index("--retry")
-        retry_ids = sys.argv[retry_idx + 1:]
+    if "--retry" in remaining_args:
+        retry_idx = remaining_args.index("--retry")
+        retry_ids = remaining_args[retry_idx + 1:]
         if not retry_ids:
             print("  Usage: python3 run_season.py --retry GAME_ID [GAME_ID ...]")
             sys.exit(1)
@@ -441,14 +447,14 @@ def main() -> None:
 
         # Optional CLI subset: python3 run_season.py START END  (1-indexed, inclusive)
         # e.g.  python3 run_season.py 1 50   → process games 1–50
-        if len(sys.argv) == 3:
+        if len(remaining_args) == 2:
             try:
-                lo = int(sys.argv[1]) - 1
-                hi = int(sys.argv[2])
+                lo = int(remaining_args[0]) - 1
+                hi = int(remaining_args[1])
                 games = games[lo:hi]
-                print(f"  Running subset: games {sys.argv[1]}–{sys.argv[2]} ({len(games)} games)")
+                print(f"  Running subset: games {remaining_args[0]}–{remaining_args[1]} ({len(games)} games)")
             except ValueError:
-                print("  Usage: python3 run_season.py [START END]  (1-indexed)")
+                print("  Usage: python3 run_season.py [--recalculate] [START END]  (1-indexed)")
                 sys.exit(1)
 
     total = len(games)
@@ -461,7 +467,7 @@ def main() -> None:
     }
 
     for idx, meta in enumerate(games, 1):
-        run_game(meta, idx, total, stats)
+        run_game(meta, idx, total, stats, recalculate=recalculate)
         if idx < total:
             print(f"\n  Sleeping {SLEEP_GAME}s before next game …")
             time.sleep(SLEEP_GAME)
