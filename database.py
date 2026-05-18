@@ -47,6 +47,7 @@ def init_db() -> None:
                 FTP         REAL NOT NULL,
                 SPS         REAL NOT NULL,
                 DES         REAL NOT NULL,
+                SSS         REAL,
                 EHI         REAL NOT NULL,
                 UNIQUE(player_id, game_id)
             );
@@ -77,10 +78,14 @@ def init_db() -> None:
 
 def _migrate_db(conn: sqlite3.Connection) -> None:
     """Add columns introduced after the initial schema without dropping existing data."""
-    try:
-        conn.execute("ALTER TABLE player_games ADD COLUMN position TEXT")
-    except sqlite3.OperationalError:
-        pass  # column already exists
+    for col_def in [
+        "ALTER TABLE player_games ADD COLUMN position TEXT",
+        "ALTER TABLE player_games ADD COLUMN SSS REAL",
+    ]:
+        try:
+            conn.execute(col_def)
+        except sqlite3.OperationalError:
+            pass  # column already exists
 
 
 def save_game(
@@ -155,6 +160,7 @@ def save_player_results(df: pd.DataFrame, game_id: str, date: str) -> int:
     """
     rows = []
     for _, r in df.iterrows():
+        sss_val = r.get("SSS")
         rows.append((
             int(r["personId"]),
             str(r["player"]),
@@ -168,6 +174,7 @@ def save_player_results(df: pd.DataFrame, game_id: str, date: str) -> int:
             float(r["FTP"]),
             float(r["SPS"]),
             float(r["DES"]),
+            float(sss_val) if sss_val is not None else None,
             float(r["EHI"]),
             str(r.get("position", "forward")),
         ))
@@ -176,8 +183,8 @@ def save_player_results(df: pd.DataFrame, game_id: str, date: str) -> int:
         conn.executemany(
             """INSERT OR REPLACE INTO player_games
                (player_id, player_name, team, game_id, date,
-                minutes, points, SQS, FDS, FTP, SPS, DES, EHI, position)
-               VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)""",
+                minutes, points, SQS, FDS, FTP, SPS, DES, SSS, EHI, position)
+               VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)""",
             rows,
         )
 

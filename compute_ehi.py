@@ -15,11 +15,13 @@ import pandas as pd
 
 from config import (
     # Weights
-    W_SQS, W_FDS, W_FTP, W_SPS, W_DES,
+    W_SQS, W_FDS, W_FTP, W_SPS, W_DES, W_SSS,
     MIN_MINUTES_THRESHOLD,
     # FTP constants
     FTP_RATIO_WEIGHT,
     FTP_VOLUME_CAP,
+    FTP_ASSIST_MULT,
+    FTP_ASSIST_CAP,
     # SPS constants
     TECH_PENALTY,
     FLAGRANT1_PENALTY,
@@ -78,6 +80,12 @@ from config import (
     SQS_XEFG_THRESHOLD_CENTER,
     SQS_XEFG_THRESHOLD_FORWARD,
     SQS_XEFG_THRESHOLD_GUARD,
+    # SSS constants
+    SSS_SELF_CREATED_MULT,
+    SSS_ASSIST_MULT,
+    SSS_DIFFICULTY_MULT,
+    SSS_NORMALIZATION,
+    SSS_ZERO_BASELINE,
 )
 
 
@@ -111,16 +119,18 @@ def compute_ftp(row: pd.Series) -> dict:
     """
     FT Dependency Score for one player (EHI ref §3).
 
-    FTP = ratio_score + volume_score  (naturally in [0, 100])
+    FTP = ratio_score + volume_score + assist_bonus
       ratio_score  = (1 − FT_dep_ratio) × FTP_RATIO_WEIGHT   (max 70)
       volume_score = min(total_pts, FTP_VOLUME_CAP)           (max 30)
+      assist_bonus = min(assists × FTP_ASSIST_MULT, FTP_ASSIST_CAP) (max 20)
 
-    Zero scorers: ft_dep_ratio=0 → ratio=70, volume=0 → FTP=70 (neutral).
+    Zero scorers: ft_dep_ratio=0 → ratio=70, volume=0 → FTP=70+assist_bonus.
     Pure FT scorers: ft_dep_ratio=1 → ratio=0, volume=min(ftm, 30).
     """
-    ftm   = int(row["freeThrowsMade"])
-    fgm_2 = int(row["twoPointersMade"])
-    fgm_3 = int(row["threePointersMade"])
+    ftm     = int(row["freeThrowsMade"])
+    fgm_2   = int(row["twoPointersMade"])
+    fgm_3   = int(row["threePointersMade"])
+    assists = int(row.get("assists", 0))
 
     ft_pts    = ftm
     fg_pts    = fgm_2 * 2 + fgm_3 * 3
@@ -130,7 +140,8 @@ def compute_ftp(row: pd.Series) -> dict:
 
     ratio_score  = (1.0 - ft_dep_ratio) * FTP_RATIO_WEIGHT
     volume_score = min(float(total_pts), float(FTP_VOLUME_CAP))
-    ftp          = ratio_score + volume_score
+    assist_bonus = min(float(assists) * FTP_ASSIST_MULT, float(FTP_ASSIST_CAP))
+    ftp          = ratio_score + volume_score + assist_bonus
 
     return dict(
         ft_pts=ft_pts,
@@ -139,6 +150,7 @@ def compute_ftp(row: pd.Series) -> dict:
         ft_dep_ratio=round(ft_dep_ratio, 4),
         ratio_score=round(ratio_score, 2),
         volume_score=round(volume_score, 2),
+        assist_bonus=round(assist_bonus, 2),
         FTP=round(ftp, 2),
         note="",
     )
@@ -1129,6 +1141,66 @@ def compute_sqs(row: pd.Series, sqs_data: dict, position: str = "forward") -> di
     )
 
 
+# ─── SUB-SCORE: SSS ───────────────────────────────────────────────────────────
+
+def compute_sss(row: pd.Series, sqs_data: dict) -> dict:
+    """
+    Scoring Skill Score for one player.
+
+    skill_score = (self_created_pts × 1.5)
+                + (assists × 3.0)
+                + sum(xeFG% × 10 for each unassisted made shot where xeFG% ≥ 0.50)
+    SSS = min((skill_score / 30) × 100, 100)
+    Zero shots and zero assists → SSS = SSS_ZERO_BASELINE (20)
+
+    self_created_pts: points from non-assisted made shots (2pt or 3pt from zone).
+    Difficulty bonus applied per qualifying self-created shot (xeFG% ≥ SQS_SC_XEFG_THRESHOLD).
+    """
+    pid     = int(row["personId"])
+    assists = int(row.get("assists", 0))
+    shots   = sqs_data.get(pid, [])
+
+    if not shots and assists == 0:
+        return dict(
+            self_created_pts=0,
+            n_self_created=0,
+            difficulty_bonus=0.0,
+            assist_component=0.0,
+            skill_score=0.0,
+            SSS=float(SSS_ZERO_BASELINE),
+            note="zero shots & assists → baseline",
+        )
+
+    self_created_pts = 0
+    n_self_created   = 0
+    difficulty_bonus = 0.0
+
+    for s in shots:
+        if s["made"] and not s["assisted"]:
+            n_self_created += 1
+            zone = s["zone"].lower()
+            pts  = 3 if ("3" in zone or "backcourt" in zone) else 2
+            self_created_pts += pts
+            if s["xefg"] >= SQS_SC_XEFG_THRESHOLD:
+                difficulty_bonus += s["xefg"] * SSS_DIFFICULTY_MULT
+
+    assist_component = float(assists) * SSS_ASSIST_MULT
+    skill_score      = (float(self_created_pts) * SSS_SELF_CREATED_MULT
+                        + assist_component
+                        + difficulty_bonus)
+    sss = min((skill_score / SSS_NORMALIZATION) * 100.0, 100.0)
+
+    return dict(
+        self_created_pts=self_created_pts,
+        n_self_created=n_self_created,
+        difficulty_bonus=round(difficulty_bonus, 2),
+        assist_component=round(assist_component, 2),
+        skill_score=round(skill_score, 2),
+        SSS=round(sss, 2),
+        note="",
+    )
+
+
 # ─── MAIN COMPUTE ─────────────────────────────────────────────────────────────
 
 def compute_all(data: dict) -> tuple[pd.DataFrame, dict]:
@@ -1169,6 +1241,7 @@ def compute_all(data: dict) -> tuple[pd.DataFrame, dict]:
         des = compute_des(row, hustle, foul_type_index, position)
         fds = compute_fds(row, foul_drawn_index, proximity_index, position)
         sqs = compute_sqs(row, sqs_data, position)
+        sss = compute_sss(row, sqs_data)
 
         pid = int(row["personId"])
         fds_detail[pid] = fds
@@ -1179,7 +1252,8 @@ def compute_all(data: dict) -> tuple[pd.DataFrame, dict]:
             + W_FDS * fds["FDS"]
             + W_FTP * ftp["FTP"]
             + W_SPS * sps["SPS"]
-            + W_DES * des["DES"],
+            + W_DES * des["DES"]
+            + W_SSS * sss["SSS"],
             2,
         )
 
@@ -1192,6 +1266,7 @@ def compute_all(data: dict) -> tuple[pd.DataFrame, dict]:
             "min":      round(row["minutes_dec"], 1),
             # ── Box score inputs ──────────────────────────────────────────
             "pts":      int(row["points"]),
+            "assists":  int(row.get("assists", 0)),
             "ftm":      int(row["freeThrowsMade"]),
             "fta":      int(row["freeThrowsAttempted"]),
             "fgm":      int(row["fieldGoalsMade"]),
@@ -1205,6 +1280,7 @@ def compute_all(data: dict) -> tuple[pd.DataFrame, dict]:
             "ft_dep%":       round(ftp["ft_dep_ratio"] * 100, 1),
             "ftp_ratio":     ftp["ratio_score"],
             "ftp_volume":    ftp["volume_score"],
+            "ftp_assist":    ftp["assist_bonus"],
             "FTP":           ftp["FTP"],
             "ftp_note":      ftp["note"],
             # ── SPS intermediates ─────────────────────────────────────────
@@ -1248,6 +1324,14 @@ def compute_all(data: dict) -> tuple[pd.DataFrame, dict]:
             "sqs_vol_bonus": sqs.get("volume_bonus", 0.0),
             "SQS":           sqs["SQS"],
             "sqs_note":      sqs["note"],
+            # ── SSS ───────────────────────────────────────────────────────
+            "sss_sc_pts":    sss["self_created_pts"],
+            "sss_n_sc":      sss["n_self_created"],
+            "sss_diff_bon":  sss["difficulty_bonus"],
+            "sss_ast_comp":  sss["assist_component"],
+            "sss_skill":     sss["skill_score"],
+            "SSS":           sss["SSS"],
+            "sss_note":      sss["note"],
             # ── EHI ───────────────────────────────────────────────────────
             "EHI": ehi,
         })
@@ -1680,14 +1764,14 @@ def print_ehi_leaderboard(df: pd.DataFrame) -> None:
     """
     df_s = df.sort_values("EHI", ascending=False).reset_index(drop=True)
 
-    W = 108
+    W = 122
     print("\n" + "=" * W)
     print("EHI — Final Leaderboard")
-    print(f"  EHI = {W_SQS}×SQS + {W_FDS}×FDS + {W_FTP}×FTP + {W_SPS}×SPS + {W_DES}×DES")
+    print(f"  EHI = {W_SQS}×SQS + {W_FDS}×FDS + {W_FTP}×FTP + {W_SPS}×SPS + {W_DES}×DES + {W_SSS}×SSS")
     print("=" * W)
     print(
         f"  {'Rk':>3}  {'Player':<22}{'Tm':>4}{'MIN':>6}"
-        f"{'SQS':>7}{'FDS':>7}{'FTP':>7}{'SPS':>7}{'DES':>7}"
+        f"{'SQS':>7}{'FDS':>7}{'FTP':>7}{'SPS':>7}{'DES':>7}{'SSS':>7}"
         f"  │{'EHI':>7}"
     )
     print("  " + "─" * (W - 2))
@@ -1696,7 +1780,7 @@ def print_ehi_leaderboard(df: pd.DataFrame) -> None:
         print(
             f"  {rank:>3}  {r['player']:<22}{r['team']:>4}{r['min']:>6.1f}"
             f"{r['SQS']:>7.1f}{r['FDS']:>7.1f}{r['FTP']:>7.1f}"
-            f"{r['SPS']:>7.1f}{r['DES']:>7.1f}"
+            f"{r['SPS']:>7.1f}{r['DES']:>7.1f}{r['SSS']:>7.1f}"
             f"  │{r['EHI']:>7.2f}"
         )
 
@@ -1706,13 +1790,15 @@ def print_ehi_leaderboard(df: pd.DataFrame) -> None:
             f"  {team} avg — "
             f"SQS:{grp['SQS'].mean():.1f}  FDS:{grp['FDS'].mean():.1f}"
             f"  FTP:{grp['FTP'].mean():.1f}  SPS:{grp['SPS'].mean():.1f}"
-            f"  DES:{grp['DES'].mean():.1f}  EHI:{grp['EHI'].mean():.2f}"
+            f"  DES:{grp['DES'].mean():.1f}  SSS:{grp['SSS'].mean():.1f}"
+            f"  EHI:{grp['EHI'].mean():.2f}"
         )
     print(
         f"  Game avg — "
         f"SQS:{df_s['SQS'].mean():.1f}  FDS:{df_s['FDS'].mean():.1f}"
         f"  FTP:{df_s['FTP'].mean():.1f}  SPS:{df_s['SPS'].mean():.1f}"
-        f"  DES:{df_s['DES'].mean():.1f}  EHI:{df_s['EHI'].mean():.2f}"
+        f"  DES:{df_s['DES'].mean():.1f}  SSS:{df_s['SSS'].mean():.1f}"
+        f"  EHI:{df_s['EHI'].mean():.2f}"
     )
     print("=" * W)
 
@@ -1736,6 +1822,7 @@ def print_bam_breakdown(df: pd.DataFrame, target_name: str = "Bam Adebayo") -> N
         ("FTP", W_FTP, r["FTP"]),
         ("SPS", W_SPS, r["SPS"]),
         ("DES", W_DES, r["DES"]),
+        ("SSS", W_SSS, r["SSS"]),
     ]
 
     BAR_W  = 22   # total bar chars
@@ -1745,7 +1832,7 @@ def print_bam_breakdown(df: pd.DataFrame, target_name: str = "Bam Adebayo") -> N
     print("\n" + "=" * W)
     print(f"EHI — {r['player']} ({r['team']})  Component Breakdown")
     print(f"  {r['min']:.1f} MIN   {int(r['pts'])} PTS   {int(r['fga'])} FGA   {int(r['fta'])} FTA")
-    print(f"  EHI = {W_SQS}×SQS + {W_FDS}×FDS + {W_FTP}×FTP + {W_SPS}×SPS + {W_DES}×DES")
+    print(f"  EHI = {W_SQS}×SQS + {W_FDS}×FDS + {W_FTP}×FTP + {W_SPS}×SPS + {W_DES}×DES + {W_SSS}×SSS")
     print("=" * W)
     print(
         f"  {'Component':<12}{'Weight':>7}{'Raw':>8}{'Contrib':>9}"
@@ -1807,7 +1894,9 @@ def print_validation_table(pts_threshold: int = 20) -> None:
                    g.home_team || ' vs ' || g.away_team AS matchup,
                    pg.date,
                    pg.points,
-                   pg.SQS, pg.FDS, pg.FTP, pg.SPS, pg.DES, pg.EHI
+                   pg.SQS, pg.FDS, pg.FTP, pg.SPS, pg.DES,
+                   COALESCE(pg.SSS, 0.0) AS SSS,
+                   pg.EHI
             FROM player_games pg
             JOIN games g USING (game_id)
             WHERE pg.points >= ?
@@ -1821,13 +1910,13 @@ def print_validation_table(pts_threshold: int = 20) -> None:
         return
 
     import statistics
-    ehis = [r[11] for r in rows]
+    ehis = [r[12] for r in rows]
     ehi_min  = min(ehis)
     ehi_max  = max(ehis)
     ehi_mean = statistics.mean(ehis)
     ehi_std  = statistics.stdev(ehis) if len(ehis) > 1 else 0.0
 
-    W = 120
+    W = 132
     print("\n" + "=" * W)
     print(f"EHI Validation Table — star players (pts ≥ {pts_threshold}), n={len(rows)}")
     print(f"  EHI range: {ehi_min:.2f}–{ehi_max:.2f}   mean: {ehi_mean:.2f}   std dev: {ehi_std:.2f}")
@@ -1836,15 +1925,15 @@ def print_validation_table(pts_threshold: int = 20) -> None:
     print(
         f"  {'Rk':>3}  {'Player':<26}{'Pos':>5}{'Tm':>4}"
         f"  {'Date':<12}  {'PTS':>4}"
-        f"  {'SQS':>6}  {'FDS':>6}  {'FTP':>6}  {'SPS':>6}  {'DES':>7}  │{'EHI':>7}"
+        f"  {'SQS':>6}  {'FDS':>6}  {'FTP':>6}  {'SPS':>6}  {'DES':>6}  {'SSS':>6}  │{'EHI':>7}"
     )
     print("  " + "─" * (W - 2))
     for rank, r in enumerate(rows, 1):
-        name, pos, team, matchup, date, pts, sqs, fds, ftp, sps, des, ehi = r
+        name, pos, team, matchup, date, pts, sqs, fds, ftp, sps, des, sss, ehi = r
         print(
             f"  {rank:>3}  {name:<26}{pos:>5}{team:>4}"
             f"  {date:<12}  {pts:>4}"
-            f"  {sqs:>6.1f}  {fds:>6.1f}  {ftp:>6.1f}  {sps:>6.1f}  {des:>7.1f}  │{ehi:>7.2f}"
+            f"  {sqs:>6.1f}  {fds:>6.1f}  {ftp:>6.1f}  {sps:>6.1f}  {des:>6.1f}  {sss:>6.1f}  │{ehi:>7.2f}"
         )
     print("  " + "─" * (W - 2))
     print(

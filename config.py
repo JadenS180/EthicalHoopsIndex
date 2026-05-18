@@ -21,11 +21,12 @@ HEADERS = {
 }
 
 # ─── EHI WEIGHTS ────────────────────────────────────────────────────────────
-W_SQS = 0.45
+W_SQS = 0.35
 W_FDS = 0.20
-W_FTP = 0.25
+W_FTP = 0.20
 W_SPS = 0.05
 W_DES = 0.05
+W_SSS = 0.15
 
 # ─── ACTIVITY FILTER ────────────────────────────────────────────────────────
 MIN_MINUTES_THRESHOLD = 8   # players below this are excluded from EHI entirely
@@ -76,8 +77,11 @@ FDS_GUARD_3PT_PENALTY  = 0.10   # legitimacy deduction for guards drawing 3pt fo
 FTP_RATIO_WEIGHT = 70
 # Volume component: min(total_pts × 1.0, FTP_VOLUME_CAP)  → max 30
 FTP_VOLUME_CAP   = 30
-# Combined FTP = ratio_score + volume_score  → naturally in [0, 100]
-# Zero scorers: ratio=70, volume=0 → FTP=70 (neutral, no special case needed)
+# Assist bonus: min(assists × FTP_ASSIST_MULT, FTP_ASSIST_CAP) → max 20
+FTP_ASSIST_MULT  = 2.0
+FTP_ASSIST_CAP   = 20
+# Combined FTP = ratio_score + volume_score + assist_bonus  → naturally bounded
+# Zero scorers: ratio=70, volume=0, assist_bonus=0 → FTP=70 (neutral)
 FT_DEP_THRESHOLD              = 0.50   # DEPRECATED
 FT_DEP_PENALTY_MULT           = 0.15   # DEPRECATED
 FT_DEP_PENALTY_EXP            = 1.3    # DEPRECATED
@@ -111,6 +115,13 @@ DEF_FOUL_MULT     = 1.0
 OFF_FOUL_MULT     = 1.3
 LOOSE_BALL_MULT   = 0.5
 ZERO_DEF_BASELINE = 25
+
+# ─── SSS CONSTANTS ──────────────────────────────────────────────────────────
+SSS_SELF_CREATED_MULT = 1.5    # multiplier for self-created points in skill_score
+SSS_ASSIST_MULT       = 3.0    # multiplier for assists in skill_score
+SSS_DIFFICULTY_MULT   = 10     # per-shot difficulty bonus: xeFG% × this
+SSS_NORMALIZATION     = 30     # skill_score representing an elite game (maps to SSS=100)
+SSS_ZERO_BASELINE     = 20     # SSS for players with zero shots and zero assists
 
 # ─── GARBAGE TIME CONSTANTS ─────────────────────────────────────────────────
 GARBAGE_TIME_LEAD         = 25
