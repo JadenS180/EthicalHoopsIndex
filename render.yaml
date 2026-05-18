@@ -13,8 +13,8 @@ services:
       #   value: https://ehi-frontend.onrender.com
 
   # ── React frontend ───────────────────────────────────────────────────────────
-  - type: web
+  - type: static
     name: ehi-frontend
-    runtime: node
-    buildCommand: cd frontend && npm install && npm run build
-    startCommand: npx serve -s frontend/dist -l $PORT
+    rootDir: frontend
+    buildCommand: npm install && npm run build
+    staticPublishPath: dist
