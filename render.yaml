@@ -17,4 +17,4 @@ services:
     name: ehi-frontend
     rootDir: frontend
     buildCommand: npm install && npm run build
-    staticPublishPath: dist
+    staticPublishPath: ./dist
