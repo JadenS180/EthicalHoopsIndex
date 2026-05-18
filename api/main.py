@@ -8,9 +8,10 @@ from fastapi.middleware.cors import CORSMiddleware
 
 app = FastAPI(title="EthicalHoopsIndex API", version="1.0.0")
 
+_default_origins = "https://ehi-frontend.onrender.com,http://localhost:5173,http://localhost:3000"
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=os.environ.get("CORS_ORIGINS", "*").split(","),
+    allow_origins=os.environ.get("CORS_ORIGINS", _default_origins).split(","),
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],
