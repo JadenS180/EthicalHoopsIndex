@@ -5,7 +5,12 @@
       "Bash(grep -A 120 \"FDS — Foul Drawing Score$\")",
       "Bash(python *)",
       "Bash(pkill -f \"run_validation.py\")",
-      "Bash(tee /tmp/ehi_validation_run.log)"
+      "Bash(tee /tmp/ehi_validation_run.log)",
+      "Bash(sqlite3 /Users/jadensmiles/EthicalHoopsIndex/ehi.db \".schema\")",
+      "Bash(sqlite3 /Users/jadensmiles/EthicalHoopsIndex/ehi.db \"SELECT DISTINCT season FROM games LIMIT 10;\")",
+      "Bash(sqlite3 /Users/jadensmiles/EthicalHoopsIndex/ehi.db \"SELECT COUNT\\(*\\) FROM player_games; SELECT COUNT\\(DISTINCT player_id\\) FROM player_games;\")",
+      "Bash(npm install *)",
+      "Bash(npm run *)"
     ]
   }
 }
