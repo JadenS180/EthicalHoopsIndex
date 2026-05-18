@@ -110,7 +110,7 @@ Zones with ≥ 50 shots in `ehi.db` use empirical values; others fall back to ha
 | Above the Break 3 | 0.3620 | 0.52 | empirical |
 | Backcourt | — | 0.30 | hardcoded |
 
-*Empirical values reflect the full 2025-26 season run (1,223 games). Corner 3 figures remain below hardcoded league averages — likely genuine sample composition rather than noise.*
+*Empirical values reflect the full 2025-26 season run (1,230 games). Corner 3 figures remain below hardcoded league averages — likely genuine sample composition rather than noise.*
 
 ---
 
@@ -183,7 +183,7 @@ EthicalHoopsIndex/
 - [x] SSS — Scoring Skill Score (self-created pts, assists, xeFG quality bonus; clamped at 100)
 - [x] Full EHI aggregation (6 sub-scores; updated weights)
 - [x] Validation across 12 games (pre-SSS formula)
-- [x] `run_season.py` — 2025-26 season complete (1,223 games, 23,313 player-game rows); **re-run tonight with new formula**
+- [x] `run_season.py` — 2025-26 season complete (1,230 games, 23,313 player-game rows; recalculated with full 6-sub-score formula)
 - [x] `query_ehi.py` — 7 query functions with CLI support; role-based leaderboards added
 
 ---
@@ -247,37 +247,57 @@ Confirmed behaviors: Bam Adebayo's 83-point game scores appropriately low on FDS
 
 ## 🏆 2025-26 Season Findings
 
-> ⚠️ **Results below are based on the pre-SSS formula (5 sub-scores, old weights). A full season re-run with the updated 6-sub-score formula is scheduled tonight. Figures will be updated after completion.**
-
-The full 2025-26 regular season run is complete. **1,223 games** processed (1,197 direct + 26 retried), **23,313 player-game rows** saved to `ehi.db`.
+The full 2025-26 regular season run is complete (recalculated with the full 6-sub-score formula including SSS). **1,230 games** processed, **23,313 player-game rows** saved to `ehi.db`.
 
 ### 📊 League-Wide Stats
 
 | Metric | Value |
 |:---|:---|
-| 🎮 Games processed | 1,223 |
+| 🎮 Games processed | 1,230 |
 | 👤 Player-game rows | 23,313 |
-| 📈 League avg EHI | **48.27** |
-| ⬆️ Season high (single game) | **75.76** — Rudy Gobert |
-| ⬇️ Season low (single game) | **8.91** — Collin Gillespie |
+| 📈 League avg EHI | **49.74** |
+| ⬆️ Season high (single game) | **80.44** — Alperen Sengun vs CHI (2026-03-23) |
+| ⬇️ Season low (single game) | **9.59** |
 
 ---
 
-### 🥇 Most Ethical Players
+### 🥇 Most Ethical Players — by Role
 
 > Min. 20 games played · Season avg EHI
 
-| Rank | Player | Avg EHI | GP | Highlight |
-|:---:|:---|:---:|:---:|:---|
-| 1 | Mitchell Robinson | **60.43** | — | Elite rim protection, near-zero FT dependency |
-| 2 | Robert Williams III | **60.06** | — | High DES, clean offense |
-| 3 | Jericho Sims | **59.23** | — | — |
-| — | Giannis Antetokounmpo | **58.04** | 35 | ⭐ Top star result — high-usage, high-EHI |
-| — | Dyson Daniels | **57.77** | 76 | ⭐ Most ethical high-volume guard/wing |
+> **Why role-based?** Low-scoring centers naturally accumulate high DES (rim protection) and a neutral FTP baseline without meaningful offensive contribution, which distorts a single overall leaderboard. Splitting by scoring tier puts each player in context. See [Known Issue: Positional Bias](#️-known-issue-positional-bias-in-top-rankings) below for details.
 
-> ⚠️ **Positional bias note:** Centers dominate the top rankings — see Known Limitations below. A fix is planned.
+#### ⭐ Stars (15+ PPG avg)
 
-> Full list: `python3 query_ehi.py season-best 2025-26`
+| Rank | Player | Avg EHI |
+|:---:|:---|:---:|
+| 1 | Giannis Antetokounmpo | **65.00** |
+| 2 | Zion Williamson | **61.99** |
+| 3 | Alperen Sengun | **61.90** |
+| 4 | Amen Thompson | **60.70** |
+| 5 | Nikola Jokic | **60.67** |
+
+#### 🎯 Role Players (8–15 PPG avg)
+
+| Rank | Player | Avg EHI |
+|:---:|:---|:---:|
+| 1 | Dyson Daniels | **64.25** |
+| 2 | Tre Jones | **59.26** |
+| 3 | Rudy Gobert | **59.00** |
+| 4 | TJ McConnell | **58.83** |
+| 5 | Nic Claxton | **58.62** |
+
+#### 🪑 Bench Players (<8 PPG avg)
+
+| Rank | Player | Avg EHI |
+|:---:|:---|:---:|
+| 1 | Mitchell Robinson | **57.81** |
+| 2 | Robert Williams III | **57.14** |
+| 3 | Moussa Diabate | **55.94** |
+| 4 | Jericho Sims | **55.71** |
+| 5 | Ryan Kalkbrenner | **55.70** |
+
+> Full role leaderboards: `python3 query_ehi.py season-roles 2025-26`
 
 ---
 
@@ -285,10 +305,13 @@ The full 2025-26 regular season run is complete. **1,223 games** processed (1,19
 
 > Min. 20 games played · Season avg EHI
 
-| Rank | Player | Avg EHI | Highlight |
-|:---:|:---|:---:|:---|
-| 1 (worst) | Jordan Poole | **39.47** | Lowest season avg in the league |
-| 2 | Grayson Allen | **40.19** | — |
+| Rank | Player | Avg EHI |
+|:---:|:---|:---:|
+| 1 (worst) | Liam McNeeley | **37.47** |
+| 2 | Doug McDermott | **38.25** |
+| 3 | Isaiah Joe | **38.85** |
+| 4 | Tim Hardaway Jr | **39.90** |
+| 5 | Jalen Wilson | **39.91** |
 
 > Full list: `python3 query_ehi.py season-worst 2025-26`
 
@@ -298,7 +321,7 @@ The full 2025-26 regular season run is complete. **1,223 games** processed (1,19
 
 | Rank | Team | Avg EHI |
 |:---:|:---|:---:|
-| 🥇 1 | New Orleans Pelicans | **49.84** |
+| 🥇 1 | New Orleans Pelicans | **51.78** |
 
 > Full 30-team ranking: `python3 query_ehi.py summary 2025-26`
 
@@ -306,12 +329,12 @@ The full 2025-26 regular season run is complete. **1,223 games** processed (1,19
 
 ### ⚠️ Known Issue: Positional Bias in Top Rankings
 
-Low-scoring centers (Robinson, Williams III, Sims) dominate the top-10 for two compounding reasons:
+Low-scoring centers accumulate high DES (elite rim protection activity) and a neutral FTP baseline (70.0 for zero scorers) without meaningful offensive contribution — inflating their overall EHI relative to high-usage stars. Two compounding factors:
 
-1. **DES normalization** — Centers divide against a baseline of 110, but elite rim protectors generate enormous raw DES without meaningful offensive contribution. Their DES scores are legitimately high, but they represent a narrow slice of basketball value.
-2. **FTP neutral baseline** — Zero-scorers default to FTP = 70.0 (neutral). Low-usage bigs who score rarely aren't penalized, giving them an edge over offensive players who draw any FT dependency at all.
+1. **DES normalization** — Centers divide raw defensive activity against a baseline of 110, but elite rim protectors still generate enormous scores without producing offense. Their DES is legitimately high, but reflects only a narrow slice of basketball value.
+2. **FTP neutral baseline** — Zero-scorers default to FTP = 70.0. Low-usage bigs aren't penalized for avoiding offense, giving them a structural edge over stars who draw any FT dependency at all.
 
-**Partial fix applied:** Role-based leaderboards (`python3 query_ehi.py season-roles 2025-26`) split players into Stars (15+ PPG), Role Players (8–15 PPG), and Bench (<8 PPG) tiers, so low-usage bigs and high-usage stars are compared within their role. An absolute formula fix (offensive usage floor or FGA-based reweighting) remains planned.
+**Partial fix — role-based leaderboards:** The top-5 tables above split players into Stars (≥ 15 PPG), Role Players (8–15 PPG), and Bench (< 8 PPG) tiers, so low-usage bigs and high-usage stars are compared within their role. An absolute formula fix (offensive usage floor or FGA-based reweighting) remains planned.
 
 ---
 
